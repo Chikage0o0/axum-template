@@ -66,7 +66,7 @@
         <DropdownMenu.Separator />
         <DropdownMenu.Item variant="destructive" onclick={onLogout}>
           <LogOutIcon />
-          Log out
+          退出登录
         </DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu.Root>

@@ -45,7 +45,7 @@ export const auth = {
 
     const flash =
       opts?.reason === "expired"
-        ? { title: "登录失效", message: "Token 已过期或无效，请重新登录" }
+        ? { title: "登录失效", message: "令牌已过期或无效，请重新登录" }
         : null;
 
     store.set({ isAuthenticated: false, token: null, flash });

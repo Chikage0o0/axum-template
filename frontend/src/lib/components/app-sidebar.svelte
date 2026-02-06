@@ -4,18 +4,18 @@
 
   const data = {
     user: {
-      name: "Admin",
+      name: "管理员",
       email: "admin@local",
       avatar: "",
     },
     navMain: [
       {
-        title: "Dashboard",
+        title: "仪表盘",
         url: "/",
         icon: LayoutDashboardIcon,
       },
       {
-        title: "Settings",
+        title: "设置",
         url: "/settings",
         icon: Settings2Icon,
       },
@@ -55,7 +55,7 @@
               </div>
               <div class="grid flex-1 text-start text-sm leading-tight">
                 <span class="truncate font-medium">PROJECT_NAME</span>
-                <span class="truncate text-xs">Admin Console</span>
+                <span class="truncate text-xs">管理控制台</span>
               </div>
             </a>
           {/snippet}

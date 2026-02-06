@@ -4,11 +4,12 @@
   import { goto } from "$app/navigation";
   import MoonIcon from "@lucide/svelte/icons/moon";
   import SunIcon from "@lucide/svelte/icons/sun";
+  import { toast } from "svelte-sonner";
   import AppSidebar from "$lib/components/app-sidebar.svelte";
-  import * as Alert from "$lib/shadcn/components/ui/alert/index.js";
   import * as Breadcrumb from "$lib/shadcn/components/ui/breadcrumb/index.js";
   import { Button } from "$lib/shadcn/components/ui/button/index.js";
   import { Separator } from "$lib/shadcn/components/ui/separator/index.js";
+  import { Toaster } from "$lib/shadcn/components/ui/sonner/index.js";
   import * as Sidebar from "$lib/shadcn/components/ui/sidebar/index.js";
   import { auth } from "$lib/stores/auth";
   import { ModeWatcher, toggleMode } from "mode-watcher";
@@ -20,10 +21,10 @@
 
   let breadcrumb = $derived.by(() => {
     if (pathname === "/settings") {
-      return { section: "Administration", page: "Settings" };
+      return { section: "管理", page: "设置" };
     }
 
-    return { section: "Administration", page: "Dashboard" };
+    return { section: "管理", page: "仪表盘" };
   });
 
   $effect(() => {
@@ -33,6 +34,14 @@
     }
   });
 
+  $effect(() => {
+    if (!isLoginRoute) return;
+    const flash = $auth.flash;
+    if (!flash) return;
+    toast.warning(flash.title, { description: flash.message });
+    auth.clearFlash();
+  });
+
   async function handleLogout() {
     auth.logout({ reason: "manual" });
     await goto("/login");
@@ -40,17 +49,11 @@
 </script>
 
 <ModeWatcher />
+<Toaster position="top-center" />
 
 {#if isLoginRoute}
   <main class="aurora-surface flex min-h-dvh w-full items-center justify-center px-4">
     <div class="w-full max-w-md space-y-4">
-      {#if $auth.flash}
-        <Alert.Root variant="destructive">
-          <Alert.Title>{$auth.flash.title}</Alert.Title>
-          <Alert.Description>{$auth.flash.message}</Alert.Description>
-        </Alert.Root>
-      {/if}
-
       {@render children()}
     </div>
   </main>
@@ -77,7 +80,7 @@
           </div>
 
           <div class="flex items-center gap-2">
-            <Button variant="outline" size="icon" onclick={toggleMode} aria-label="Toggle theme">
+            <Button variant="outline" size="icon" onclick={toggleMode} aria-label="切换主题">
               <SunIcon class="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
               <MoonIcon class="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
             </Button>

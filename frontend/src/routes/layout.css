@@ -162,6 +162,26 @@
     );
 }
 
+[data-sonner-toast][data-type="success"] [data-icon] {
+  color: color-mix(in oklch, var(--chart-3) 82%, var(--foreground) 18%);
+}
+
+[data-sonner-toast][data-type="info"] [data-icon] {
+  color: color-mix(in oklch, var(--chart-1) 84%, var(--foreground) 16%);
+}
+
+[data-sonner-toast][data-type="warning"] [data-icon] {
+  color: color-mix(in oklch, var(--chart-4) 86%, var(--foreground) 14%);
+}
+
+[data-sonner-toast][data-type="error"] [data-icon] {
+  color: color-mix(in oklch, var(--destructive) 88%, var(--foreground) 12%);
+}
+
+[data-sonner-toast][data-type="loading"] [data-icon] {
+  color: color-mix(in oklch, var(--primary) 84%, var(--foreground) 16%);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

@@ -1,8 +1,8 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { toast } from "svelte-sonner";
   import { auth } from "$lib/stores/auth";
   import { createSession } from "$lib/utils/settings";
-  import * as Alert from "$lib/shadcn/components/ui/alert/index.js";
   import { Button } from "$lib/shadcn/components/ui/button/index.js";
   import * as Card from "$lib/shadcn/components/ui/card/index.js";
   import { Input } from "$lib/shadcn/components/ui/input/index.js";
@@ -10,13 +10,11 @@
 
   let password = $state("");
   let submitting = $state(false);
-  let error = $state<string | null>(null);
 
   async function submit() {
-    error = null;
     const p = password.trim();
     if (!p) {
-      error = "请输入管理员密码";
+      toast.error("请输入管理员密码");
       return;
     }
 
@@ -26,7 +24,7 @@
       auth.login(res.token);
       await goto("/settings");
     } catch (e) {
-      error = e instanceof Error ? e.message : "登录失败";
+      toast.error(e instanceof Error ? e.message : "登录失败");
     } finally {
       submitting = false;
     }
@@ -35,8 +33,7 @@
 
 <Card.Root>
   <Card.Header>
-    <Card.Title>Login</Card.Title>
-    <Card.Description>输入管理员密码获取 Bearer Token。</Card.Description>
+    <Card.Title>登录</Card.Title>
   </Card.Header>
 
   <Card.Content>
@@ -48,7 +45,7 @@
       }}
     >
       <div class="space-y-2">
-        <Label for="password">Password</Label>
+        <Label for="password">管理员密码</Label>
         <Input
           id="password"
           type="password"
@@ -58,15 +55,8 @@
         />
       </div>
 
-      {#if error}
-        <Alert.Root variant="destructive">
-          <Alert.Title>登录失败</Alert.Title>
-          <Alert.Description>{error}</Alert.Description>
-        </Alert.Root>
-      {/if}
-
       <Button class="w-full" type="submit" disabled={submitting}>
-        {submitting ? "Signing in..." : "Sign in"}
+        {submitting ? "登录中..." : "登录"}
       </Button>
     </form>
   </Card.Content>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
+  import { toast } from "svelte-sonner";
   import { auth } from "$lib/stores/auth";
   import {
     changeAdminPassword,
@@ -50,11 +51,10 @@
 
   async function save() {
     if (!settings) {
-      error = "配置尚未加载";
+      toast.error("配置尚未加载");
       return;
     }
 
-    error = null;
     saving = true;
     try {
       const payload: PatchSettingsRequest = {};
@@ -90,7 +90,7 @@
       exampleApiBase = updated.integrations.example_api_base;
       exampleApiKey = "";
     } catch (e) {
-      error = e instanceof Error ? e.message : "保存失败";
+      toast.error(e instanceof Error ? e.message : "保存失败");
     } finally {
       saving = false;
     }
@@ -100,34 +100,33 @@
   let newPassword = $state("");
   let confirmPassword = $state("");
   let changing = $state(false);
-  let pwError = $state<string | null>(null);
 
   async function changePassword() {
-    pwError = null;
     const cur = currentPassword;
     const next = newPassword;
     const confirm = confirmPassword;
 
     if (!cur.trim()) {
-      pwError = "当前密码不能为空";
+      toast.error("当前密码不能为空");
       return;
     }
     if (next.trim().length < 8) {
-      pwError = "新密码长度不能小于 8";
+      toast.error("新密码长度不能小于 8");
       return;
     }
     if (next !== confirm) {
-      pwError = "两次输入的新密码不一致";
+      toast.error("两次输入的新密码不一致");
       return;
     }
 
     changing = true;
     try {
       await changeAdminPassword({ current_password: cur, new_password: next });
+      toast.success("密码已更新，请重新登录");
       auth.logout({ reason: "manual" });
       await goto("/login");
     } catch (e) {
-      pwError = e instanceof Error ? e.message : "修改失败";
+      toast.error(e instanceof Error ? e.message : "修改失败");
     } finally {
       changing = false;
     }
@@ -140,8 +139,7 @@
 
 <div class="space-y-6">
   <div>
-    <h1 class="text-2xl font-semibold tracking-tight">Settings</h1>
-    <p class="text-muted-foreground mt-1 text-sm">运行期配置来自 DB 的 system_config，保存后会热更新。</p>
+    <h1 class="text-2xl font-semibold tracking-tight">设置</h1>
   </div>
 
   {#if error}
@@ -156,14 +154,13 @@
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Card.Title>运行期配置</Card.Title>
-          <Card.Description>更新参数后会立即作用于后端运行时。</Card.Description>
         </div>
         <div class="flex items-center gap-2">
           <Button variant="outline" disabled={loading || saving} onclick={reload}>
-            {loading ? "Loading..." : "Reload"}
+            {loading ? "加载中..." : "刷新"}
           </Button>
           <Button disabled={loading || saving} onclick={save}>
-            {saving ? "Saving..." : "Save"}
+            {saving ? "保存中..." : "保存"}
           </Button>
         </div>
       </div>
@@ -209,7 +206,6 @@
   <Card.Root>
     <Card.Header>
       <Card.Title>修改管理员密码</Card.Title>
-      <Card.Description>密码更新后将立即退出当前登录态。</Card.Description>
     </Card.Header>
     <Card.Content>
       <form
@@ -252,16 +248,9 @@
           />
         </div>
 
-        {#if pwError}
-          <Alert.Root variant="destructive">
-            <Alert.Title>密码修改失败</Alert.Title>
-            <Alert.Description>{pwError}</Alert.Description>
-          </Alert.Root>
-        {/if}
-
         <div class="flex justify-end">
           <Button type="submit" disabled={changing}>
-            {changing ? "Submitting..." : "Update password"}
+            {changing ? "更新中..." : "更新密码"}
           </Button>
         </div>
       </form>

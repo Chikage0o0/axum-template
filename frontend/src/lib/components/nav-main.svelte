@@ -23,7 +23,7 @@
 </script>
 
 <Sidebar.Group>
-  <Sidebar.GroupLabel>Platform</Sidebar.GroupLabel>
+  <Sidebar.GroupLabel>平台</Sidebar.GroupLabel>
   <Sidebar.Menu>
     {#each items as mainItem (mainItem.title)}
       <Sidebar.MenuItem>
