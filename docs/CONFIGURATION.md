@@ -1,0 +1,31 @@
+# 配置说明
+
+本模板采用“两阶段配置”：
+
+1. **启动期（Bootstrap）配置**：只负责“连库 + 绑定端口”，来自环境变量。
+2. **运行期（Runtime）配置**：其余全部来自数据库 `system_config`。
+
+## 启动期配置（环境变量）
+
+- `DATABASE_URL`（必填）
+- `SERVER__HOST` / `SERVER__PORT`（可选）
+- `RUST_LOG`（可选）
+
+可选：
+
+- `SEED_ADMIN_PASSWORD`：首次初始化管理员密码覆盖值（仅首次 seed 生效）
+- `PROJECT_NAME_AUTO_MIGRATE`：是否启动时自动迁移（默认 true）
+- `PROJECT_NAME_EXPOSE_OPENAPI`：是否暴露 OpenAPI/Swagger UI（默认 debug 开、release 关）
+
+## 运行期配置（DB: system_config）
+
+表结构：`system_config(key, value jsonb, description, updated_at)`
+
+示例 key：
+
+- `security.jwt_secret`
+- `security.admin_password_hash`
+- `app.check_interval_secs`
+- `app.welcome_message`
+- `integrations.example_api_base`
+- `integrations.example_api_key`

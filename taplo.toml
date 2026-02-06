@@ -1,0 +1,6 @@
+[formatting]
+column_width = 100
+indent_string = "  "
+
+[[rule]]
+include = ["Cargo.toml", "**/*.toml"]

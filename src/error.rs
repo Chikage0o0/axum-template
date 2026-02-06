@@ -1,0 +1,113 @@
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    Json,
+};
+use garde::Report;
+use serde::Serialize;
+use thiserror::Error;
+
+use crate::api::request_id::current_request_id;
+
+#[derive(Debug, Error)]
+pub enum AppError {
+    #[error("身份验证失败: {0}")]
+    AuthError(String),
+    #[error("权限不足: {0}")]
+    PermissionDenied(String),
+    #[error("验证失败: {message}")]
+    ValidationError {
+        message: String,
+        details: Option<serde_json::Value>,
+    },
+    #[error("未找到资源: {0}")]
+    NotFound(String),
+    #[error("服务器内部错误: {0}")]
+    InternalError(String),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+impl AppError {
+    pub fn validation(message: impl Into<String>) -> Self {
+        Self::ValidationError {
+            message: message.into(),
+            details: None,
+        }
+    }
+
+    pub fn validation_with_details(
+        message: impl Into<String>,
+        details: Option<serde_json::Value>,
+    ) -> Self {
+        Self::ValidationError {
+            message: message.into(),
+            details,
+        }
+    }
+
+    pub fn from_garde_report(prefix: &str, report: Report) -> Self {
+        let mut map: std::collections::BTreeMap<String, Vec<String>> =
+            std::collections::BTreeMap::new();
+        for (path, error) in report.iter() {
+            map.entry(path.to_string())
+                .or_default()
+                .push(error.to_string());
+        }
+        let details = serde_json::to_value(map).ok();
+        Self::validation_with_details(prefix.to_string(), details)
+    }
+
+    pub fn error_code(&self) -> u16 {
+        match self {
+            AppError::ValidationError { .. } => 1000,
+            AppError::AuthError(_) => 1001,
+            AppError::PermissionDenied(_) => 2002,
+            AppError::NotFound(_) => 2000,
+            AppError::InternalError(_) => 5000,
+            AppError::Unknown(_) => 5000,
+        }
+    }
+
+    pub fn status_code(&self) -> StatusCode {
+        match self {
+            AppError::AuthError(_) => StatusCode::UNAUTHORIZED,
+            AppError::PermissionDenied(_) => StatusCode::FORBIDDEN,
+            AppError::ValidationError { .. } => StatusCode::BAD_REQUEST,
+            AppError::NotFound(_) => StatusCode::NOT_FOUND,
+            AppError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::Unknown(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct ErrorResponse {
+    code: u16,
+    message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    details: Option<serde_json::Value>,
+    request_id: String,
+}
+
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response {
+        let status = self.status_code();
+        let code = self.error_code();
+        let message = self.to_string();
+        let details = match &self {
+            AppError::ValidationError { details, .. } => details.clone(),
+            _ => None,
+        };
+        let request_id = current_request_id().unwrap_or_else(|| "req_unknown".to_string());
+
+        let body = Json(ErrorResponse {
+            code,
+            message,
+            details,
+            request_id,
+        });
+
+        (status, body).into_response()
+    }
+}

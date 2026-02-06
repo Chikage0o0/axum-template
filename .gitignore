@@ -1,0 +1,15 @@
+# Template build artifacts
+/target/
+
+# Frontend
+/frontend/node_modules/
+/frontend/.svelte-kit/
+/frontend/build/
+/frontend/.vite/
+
+# Devenv
+.devenv*
+
+# Env files
+.env
+.env.*
