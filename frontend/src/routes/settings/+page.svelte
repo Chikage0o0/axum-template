@@ -130,7 +130,7 @@
 <div class="space-y-6">
   <div>
     <h1 class="text-2xl font-semibold tracking-tight">Settings</h1>
-    <p class="mt-1 text-sm" style="color: var(--muted)">运行期配置来自 DB：system_config，保存后热更新。</p>
+    <p class="mt-1 text-sm" style="color: var(--muted-foreground)">运行期配置来自 DB：system_config，保存后热更新。</p>
   </div>
 
   {#if error}
@@ -146,7 +146,7 @@
         <button class="rounded-md border px-3 py-1 text-sm" style="border-color: var(--border)" disabled={loading || saving} onclick={reload}>
           {loading ? "Loading..." : "Reload"}
         </button>
-        <button class="rounded-md px-3 py-1 text-sm font-medium" style="background: var(--accent); color: #05202b" disabled={loading || saving} onclick={save}>
+        <button class="rounded-md px-3 py-1 text-sm font-medium" style="background: var(--primary); color: var(--primary-foreground)" disabled={loading || saving} onclick={save}>
           {saving ? "Saving..." : "Save"}
         </button>
       </div>
@@ -156,26 +156,26 @@
       <div class="grid gap-3 sm:grid-cols-2">
         <label class="block text-sm">
           app.check_interval_secs
-          <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: rgba(255, 255, 255, 0.04)" type="number" bind:value={checkIntervalSecs} />
+          <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: var(--background)" type="number" bind:value={checkIntervalSecs} />
         </label>
 
         <label class="block text-sm">
           integrations.example_api_base
-          <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: rgba(255, 255, 255, 0.04)" bind:value={exampleApiBase} />
+          <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: var(--background)" bind:value={exampleApiBase} />
         </label>
 
         <label class="block text-sm sm:col-span-2">
           app.welcome_message
-          <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: rgba(255, 255, 255, 0.04)" bind:value={welcomeMessage} />
+          <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: var(--background)" bind:value={welcomeMessage} />
         </label>
 
         <label class="block text-sm sm:col-span-2">
           integrations.example_api_key（覆盖设置，留空不修改）
-          <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: rgba(255, 255, 255, 0.04)" type="password" bind:value={exampleApiKey} placeholder={settings.integrations.example_api_key_is_set ? "已设置" : "未设置"} />
+          <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: var(--background)" type="password" bind:value={exampleApiKey} placeholder={settings.integrations.example_api_key_is_set ? "已设置" : "未设置"} />
         </label>
       </div>
     {:else}
-      <p class="text-sm" style="color: var(--muted)">尚未加载</p>
+      <p class="text-sm" style="color: var(--muted-foreground)">尚未加载</p>
     {/if}
   </section>
 
@@ -190,22 +190,22 @@
     >
       <label class="block text-sm">
         当前密码
-        <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: rgba(255, 255, 255, 0.04)" type="password" bind:value={currentPassword} disabled={changing} />
+        <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: var(--background)" type="password" bind:value={currentPassword} disabled={changing} />
       </label>
       <label class="block text-sm">
         新密码（>= 8）
-        <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: rgba(255, 255, 255, 0.04)" type="password" bind:value={newPassword} disabled={changing} />
+        <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: var(--background)" type="password" bind:value={newPassword} disabled={changing} />
       </label>
       <label class="block text-sm">
         确认新密码
-        <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: rgba(255, 255, 255, 0.04)" type="password" bind:value={confirmPassword} disabled={changing} />
+        <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: var(--background)" type="password" bind:value={confirmPassword} disabled={changing} />
       </label>
 
       {#if pwError}
-        <div class="text-sm" style="color: #fecaca">{pwError}</div>
+        <div class="text-sm" style="color: var(--destructive)">{pwError}</div>
       {/if}
 
-      <button class="rounded-md px-3 py-2 text-sm font-medium" style="background: var(--accent); color: #05202b" disabled={changing} type="submit">
+      <button class="rounded-md px-3 py-2 text-sm font-medium" style="background: var(--primary); color: var(--primary-foreground)" disabled={changing} type="submit">
         {changing ? "Submitting..." : "Update password"}
       </button>
     </form>

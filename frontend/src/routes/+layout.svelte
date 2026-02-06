@@ -2,7 +2,10 @@
   import "./layout.css";
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
+  import MoonIcon from "@lucide/svelte/icons/moon";
+  import SunIcon from "@lucide/svelte/icons/sun";
   import { auth } from "$lib/stores/auth";
+  import { ModeWatcher, toggleMode } from "mode-watcher";
 
   let { children } = $props();
 
@@ -33,12 +36,14 @@
   }
 </script>
 
+<ModeWatcher />
+
 <div class="min-h-dvh">
-  <header class="sticky top-0 z-10 border-b" style="border-color: var(--border); background: rgba(11, 15, 25, 0.72); backdrop-filter: blur(10px)">
+  <header class="sticky top-0 z-10 border-b" style="border-color: var(--border); background: color-mix(in oklch, var(--background) 86%, transparent); backdrop-filter: blur(10px)">
     <div class="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
       <div class="leading-tight">
         <div class="font-semibold tracking-tight">PROJECT_NAME</div>
-        <div class="text-xs" style="color: var(--muted)">Template: conventions over business</div>
+        <div class="text-xs" style="color: var(--muted-foreground)">Template: conventions over business</div>
       </div>
 
       {#if !isLoginRoute}
@@ -46,7 +51,7 @@
           {#each nav as item}
             <a
               class="text-sm hover:underline"
-              style="color: {page.url.pathname === item.href ? 'var(--accent)' : 'var(--fg)'}"
+              style="color: {page.url.pathname === item.href ? 'var(--primary)' : 'var(--foreground)'}"
               href={item.href}
               >{item.label}</a
             >
@@ -55,6 +60,17 @@
       {/if}
 
       <div class="flex items-center gap-2">
+        <button
+          class="relative inline-flex size-9 items-center justify-center rounded-md border"
+          style="border-color: var(--border); background: var(--card)"
+          onclick={toggleMode}
+          type="button"
+          aria-label="切换主题"
+        >
+          <SunIcon class="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+          <MoonIcon class="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+        </button>
+
         {#if $auth.isAuthenticated}
           <button
             class="rounded-md border px-3 py-1 text-sm"

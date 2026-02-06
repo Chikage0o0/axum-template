@@ -1,6 +1,8 @@
 /* eslint-disable */
 /* This file is generated - do not edit */
 
+import { z } from "zod";
+
 export const PatchAdminPasswordRequest = z
   .object({
     current_password: z.string().min(1).max(256),

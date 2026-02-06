@@ -5,4 +5,4 @@
   });
 </script>
 
-<p class="text-sm" style="color: var(--muted)">Redirecting...</p>
+<p class="text-sm" style="color: var(--muted-foreground)">Redirecting...</p>

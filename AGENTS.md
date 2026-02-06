@@ -53,6 +53,8 @@
 
 - 组件内状态优先使用 `$state` / `$derived` / `$effect`，props 使用 `$props()`。
 - 禁止从 `$app/stores` 导入（弃用）。统一使用 `$app/state`。
+- 前端开发必须优先使用 shadcn-svelte 组件；仅在无法满足需求时再实现自定义组件。
+- 严禁修改 `frontend/src/lib/shadcn` 目录下代码；新增组件统一通过 shadcn-svelte CLI 生成。
 
 ## 4. 文档
 

@@ -30,7 +30,7 @@
 
 <div class="mx-auto max-w-md space-y-4">
   <h1 class="text-2xl font-semibold tracking-tight">Login</h1>
-  <p class="text-sm" style="color: var(--muted)">模板只提供最小登录能力：换取 Bearer Token。</p>
+  <p class="text-sm" style="color: var(--muted-foreground)">模板只提供最小登录能力：换取 Bearer Token。</p>
 
 <form
     class="rounded-xl border p-4 space-y-3"
@@ -44,7 +44,7 @@
       Password
       <input
         class="mt-1 w-full rounded-md border px-3 py-2"
-        style="border-color: var(--border); background: rgba(255, 255, 255, 0.04)"
+        style="border-color: var(--border); background: var(--background)"
         type="password"
         bind:value={password}
         autocomplete="current-password"
@@ -53,12 +53,12 @@
     </label>
 
     {#if error}
-      <div class="text-sm" style="color: #fecaca">{error}</div>
+      <div class="text-sm" style="color: var(--destructive)">{error}</div>
     {/if}
 
     <button
       class="w-full rounded-md px-3 py-2 text-sm font-medium"
-      style="background: var(--accent); color: #05202b"
+      style="background: var(--primary); color: var(--primary-foreground)"
       type="submit"
       disabled={submitting}
     >
