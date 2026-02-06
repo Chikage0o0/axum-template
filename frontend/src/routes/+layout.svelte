@@ -4,30 +4,33 @@
   import { goto } from "$app/navigation";
   import MoonIcon from "@lucide/svelte/icons/moon";
   import SunIcon from "@lucide/svelte/icons/sun";
+  import AppSidebar from "$lib/components/app-sidebar.svelte";
+  import * as Alert from "$lib/shadcn/components/ui/alert/index.js";
+  import * as Breadcrumb from "$lib/shadcn/components/ui/breadcrumb/index.js";
+  import { Button } from "$lib/shadcn/components/ui/button/index.js";
+  import { Separator } from "$lib/shadcn/components/ui/separator/index.js";
+  import * as Sidebar from "$lib/shadcn/components/ui/sidebar/index.js";
   import { auth } from "$lib/stores/auth";
   import { ModeWatcher, toggleMode } from "mode-watcher";
 
   let { children } = $props();
 
-  const nav = [
-    { href: "/settings", label: "Settings" }
-  ] as const;
-
   let isLoginRoute = $derived(page.url.pathname.startsWith("/login"));
+  let pathname = $derived(page.url.pathname);
+
+  let breadcrumb = $derived.by(() => {
+    if (pathname === "/settings") {
+      return { section: "Administration", page: "Settings" };
+    }
+
+    return { section: "Administration", page: "Dashboard" };
+  });
 
   $effect(() => {
     if (isLoginRoute) return;
     if (!$auth.isAuthenticated) {
       void goto("/login");
     }
-  });
-
-  $effect(() => {
-    if (!isLoginRoute) return;
-    if (!$auth.flash) return;
-    // 为了保持模板最小化：这里用 alert 作为示例；实际项目建议用 toast。
-    alert(`${$auth.flash.title}\n\n${$auth.flash.message}`);
-    auth.clearFlash();
   });
 
   async function handleLogout() {
@@ -38,53 +41,55 @@
 
 <ModeWatcher />
 
-<div class="min-h-dvh">
-  <header class="sticky top-0 z-10 border-b" style="border-color: var(--border); background: color-mix(in oklch, var(--background) 86%, transparent); backdrop-filter: blur(10px)">
-    <div class="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
-      <div class="leading-tight">
-        <div class="font-semibold tracking-tight">PROJECT_NAME</div>
-        <div class="text-xs" style="color: var(--muted-foreground)">Template: conventions over business</div>
-      </div>
-
-      {#if !isLoginRoute}
-        <nav class="flex items-center gap-3" aria-label="Primary">
-          {#each nav as item}
-            <a
-              class="text-sm hover:underline"
-              style="color: {page.url.pathname === item.href ? 'var(--primary)' : 'var(--foreground)'}"
-              href={item.href}
-              >{item.label}</a
-            >
-          {/each}
-        </nav>
+{#if isLoginRoute}
+  <main class="aurora-surface flex min-h-dvh w-full items-center justify-center px-4">
+    <div class="w-full max-w-md space-y-4">
+      {#if $auth.flash}
+        <Alert.Root variant="destructive">
+          <Alert.Title>{$auth.flash.title}</Alert.Title>
+          <Alert.Description>{$auth.flash.message}</Alert.Description>
+        </Alert.Root>
       {/if}
 
-      <div class="flex items-center gap-2">
-        <button
-          class="relative inline-flex size-9 items-center justify-center rounded-md border"
-          style="border-color: var(--border); background: var(--card)"
-          onclick={toggleMode}
-          type="button"
-          aria-label="切换主题"
-        >
-          <SunIcon class="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-          <MoonIcon class="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-        </button>
-
-        {#if $auth.isAuthenticated}
-          <button
-            class="rounded-md border px-3 py-1 text-sm"
-            style="border-color: var(--border); background: var(--card)"
-            onclick={handleLogout}
-          >
-            Logout
-          </button>
-        {/if}
-      </div>
+      {@render children()}
     </div>
-  </header>
-
-  <main class="mx-auto max-w-5xl px-4 py-8">
-    {@render children()}
   </main>
-</div>
+{:else}
+  <Sidebar.Provider>
+    <AppSidebar currentPath={pathname} onLogout={handleLogout} />
+    <Sidebar.Inset class="aurora-surface">
+      <header class="flex h-16 shrink-0 items-center gap-2 border-b">
+        <div class="flex w-full items-center justify-between gap-2 px-4">
+          <div class="flex items-center gap-2">
+            <Sidebar.Trigger class="-ms-1" />
+            <Separator orientation="vertical" class="me-2 data-[orientation=vertical]:h-4" />
+            <Breadcrumb.Root>
+              <Breadcrumb.List>
+                <Breadcrumb.Item class="hidden md:block">
+                  <Breadcrumb.Link href="/">{breadcrumb.section}</Breadcrumb.Link>
+                </Breadcrumb.Item>
+                <Breadcrumb.Separator class="hidden md:block" />
+                <Breadcrumb.Item>
+                  <Breadcrumb.Page>{breadcrumb.page}</Breadcrumb.Page>
+                </Breadcrumb.Item>
+              </Breadcrumb.List>
+            </Breadcrumb.Root>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <Button variant="outline" size="icon" onclick={toggleMode} aria-label="Toggle theme">
+              <SunIcon class="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+              <MoonIcon class="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <div class="flex flex-1 flex-col p-4">
+        <main class="flex-1">
+          {@render children()}
+        </main>
+      </div>
+    </Sidebar.Inset>
+  </Sidebar.Provider>
+{/if}

@@ -2,7 +2,18 @@
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
   import { auth } from "$lib/stores/auth";
-  import { changeAdminPassword, getSettings, patchSettings, type PatchSettingsRequest, type SettingsResponse } from "$lib/utils/settings";
+  import {
+    changeAdminPassword,
+    getSettings,
+    patchSettings,
+    type PatchSettingsRequest,
+    type SettingsResponse,
+  } from "$lib/utils/settings";
+  import * as Alert from "$lib/shadcn/components/ui/alert/index.js";
+  import { Button } from "$lib/shadcn/components/ui/button/index.js";
+  import * as Card from "$lib/shadcn/components/ui/card/index.js";
+  import { Input } from "$lib/shadcn/components/ui/input/index.js";
+  import { Label } from "$lib/shadcn/components/ui/label/index.js";
 
   let settings = $state<SettingsResponse | null>(null);
   let loading = $state(false);
@@ -130,84 +141,130 @@
 <div class="space-y-6">
   <div>
     <h1 class="text-2xl font-semibold tracking-tight">Settings</h1>
-    <p class="mt-1 text-sm" style="color: var(--muted-foreground)">运行期配置来自 DB：system_config，保存后热更新。</p>
+    <p class="text-muted-foreground mt-1 text-sm">运行期配置来自 DB 的 system_config，保存后会热更新。</p>
   </div>
 
   {#if error}
-    <div class="rounded-lg border p-3 text-sm" style="border-color: var(--border); background: rgba(239, 68, 68, 0.10)">
-      {error}
-    </div>
+    <Alert.Root variant="destructive">
+      <Alert.Title>请求失败</Alert.Title>
+      <Alert.Description>{error}</Alert.Description>
+    </Alert.Root>
   {/if}
 
-  <section class="rounded-xl border p-4 space-y-3" style="border-color: var(--border); background: var(--card)">
-    <div class="flex items-center justify-between gap-3">
-      <h2 class="font-medium">运行期配置</h2>
-      <div class="flex items-center gap-2">
-        <button class="rounded-md border px-3 py-1 text-sm" style="border-color: var(--border)" disabled={loading || saving} onclick={reload}>
-          {loading ? "Loading..." : "Reload"}
-        </button>
-        <button class="rounded-md px-3 py-1 text-sm font-medium" style="background: var(--primary); color: var(--primary-foreground)" disabled={loading || saving} onclick={save}>
-          {saving ? "Saving..." : "Save"}
-        </button>
+  <Card.Root id="runtime">
+    <Card.Header class="space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <Card.Title>运行期配置</Card.Title>
+          <Card.Description>更新参数后会立即作用于后端运行时。</Card.Description>
+        </div>
+        <div class="flex items-center gap-2">
+          <Button variant="outline" disabled={loading || saving} onclick={reload}>
+            {loading ? "Loading..." : "Reload"}
+          </Button>
+          <Button disabled={loading || saving} onclick={save}>
+            {saving ? "Saving..." : "Save"}
+          </Button>
+        </div>
       </div>
-    </div>
+    </Card.Header>
+    <Card.Content>
+      {#if settings}
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div class="space-y-2">
+            <Label for="check_interval_secs">app.check_interval_secs</Label>
+            <Input
+              id="check_interval_secs"
+              type="number"
+              bind:value={checkIntervalSecs}
+            />
+          </div>
 
-    {#if settings}
-      <div class="grid gap-3 sm:grid-cols-2">
-        <label class="block text-sm">
-          app.check_interval_secs
-          <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: var(--background)" type="number" bind:value={checkIntervalSecs} />
-        </label>
+          <div class="space-y-2">
+            <Label for="example_api_base">integrations.example_api_base</Label>
+            <Input id="example_api_base" bind:value={exampleApiBase} />
+          </div>
 
-        <label class="block text-sm">
-          integrations.example_api_base
-          <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: var(--background)" bind:value={exampleApiBase} />
-        </label>
+          <div class="space-y-2 sm:col-span-2">
+            <Label for="welcome_message">app.welcome_message</Label>
+            <Input id="welcome_message" bind:value={welcomeMessage} />
+          </div>
 
-        <label class="block text-sm sm:col-span-2">
-          app.welcome_message
-          <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: var(--background)" bind:value={welcomeMessage} />
-        </label>
-
-        <label class="block text-sm sm:col-span-2">
-          integrations.example_api_key（覆盖设置，留空不修改）
-          <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: var(--background)" type="password" bind:value={exampleApiKey} placeholder={settings.integrations.example_api_key_is_set ? "已设置" : "未设置"} />
-        </label>
-      </div>
-    {:else}
-      <p class="text-sm" style="color: var(--muted-foreground)">尚未加载</p>
-    {/if}
-  </section>
-
-  <section class="rounded-xl border p-4 space-y-3" style="border-color: var(--border); background: var(--card)">
-    <h2 class="font-medium">修改管理员密码</h2>
-    <form
-      class="grid gap-3"
-      onsubmit={(e: SubmitEvent) => {
-        e.preventDefault();
-        void changePassword();
-      }}
-    >
-      <label class="block text-sm">
-        当前密码
-        <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: var(--background)" type="password" bind:value={currentPassword} disabled={changing} />
-      </label>
-      <label class="block text-sm">
-        新密码（>= 8）
-        <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: var(--background)" type="password" bind:value={newPassword} disabled={changing} />
-      </label>
-      <label class="block text-sm">
-        确认新密码
-        <input class="mt-1 w-full rounded-md border px-3 py-2" style="border-color: var(--border); background: var(--background)" type="password" bind:value={confirmPassword} disabled={changing} />
-      </label>
-
-      {#if pwError}
-        <div class="text-sm" style="color: var(--destructive)">{pwError}</div>
+          <div class="space-y-2 sm:col-span-2">
+            <Label for="example_api_key">integrations.example_api_key（留空不修改）</Label>
+            <Input
+              id="example_api_key"
+              type="password"
+              bind:value={exampleApiKey}
+              placeholder={settings.integrations.example_api_key_is_set ? "已设置" : "未设置"}
+            />
+          </div>
+        </div>
+      {:else}
+        <p class="text-muted-foreground text-sm">尚未加载配置。</p>
       {/if}
+    </Card.Content>
+  </Card.Root>
 
-      <button class="rounded-md px-3 py-2 text-sm font-medium" style="background: var(--primary); color: var(--primary-foreground)" disabled={changing} type="submit">
-        {changing ? "Submitting..." : "Update password"}
-      </button>
-    </form>
-  </section>
+  <Card.Root>
+    <Card.Header>
+      <Card.Title>修改管理员密码</Card.Title>
+      <Card.Description>密码更新后将立即退出当前登录态。</Card.Description>
+    </Card.Header>
+    <Card.Content>
+      <form
+        class="grid gap-4"
+        onsubmit={(e: SubmitEvent) => {
+          e.preventDefault();
+          void changePassword();
+        }}
+      >
+        <div class="space-y-2">
+          <Label for="current_password">当前密码</Label>
+          <Input
+            id="current_password"
+            type="password"
+            bind:value={currentPassword}
+            disabled={changing}
+            autocomplete="current-password"
+          />
+        </div>
+
+        <div class="space-y-2">
+          <Label for="new_password">新密码（至少 8 位）</Label>
+          <Input
+            id="new_password"
+            type="password"
+            bind:value={newPassword}
+            disabled={changing}
+            autocomplete="new-password"
+          />
+        </div>
+
+        <div class="space-y-2">
+          <Label for="confirm_password">确认新密码</Label>
+          <Input
+            id="confirm_password"
+            type="password"
+            bind:value={confirmPassword}
+            disabled={changing}
+            autocomplete="new-password"
+          />
+        </div>
+
+        {#if pwError}
+          <Alert.Root variant="destructive">
+            <Alert.Title>密码修改失败</Alert.Title>
+            <Alert.Description>{pwError}</Alert.Description>
+          </Alert.Root>
+        {/if}
+
+        <div class="flex justify-end">
+          <Button type="submit" disabled={changing}>
+            {changing ? "Submitting..." : "Update password"}
+          </Button>
+        </div>
+      </form>
+    </Card.Content>
+  </Card.Root>
 </div>
