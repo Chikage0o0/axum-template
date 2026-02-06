@@ -22,3 +22,28 @@ pub fn opt_u64_min_10(v: &Option<u64>, _ctx: &()) -> garde::Result {
     }
     Ok(())
 }
+
+pub fn string_basic_email(v: &str, _ctx: &()) -> garde::Result {
+    let v = v.trim();
+    if v.is_empty() {
+        return Err(garde::Error::new("不能为空"));
+    }
+    let at_index = v.find('@');
+    let Some(at_index) = at_index else {
+        return Err(garde::Error::new("邮箱格式不合法"));
+    };
+    if at_index == 0 || at_index + 1 >= v.len() {
+        return Err(garde::Error::new("邮箱格式不合法"));
+    }
+    if !v[at_index + 1..].contains('.') {
+        return Err(garde::Error::new("邮箱格式不合法"));
+    }
+    Ok(())
+}
+
+pub fn opt_string_basic_email(v: &Option<String>, _ctx: &()) -> garde::Result {
+    if let Some(s) = v {
+        string_basic_email(s, &())?;
+    }
+    Ok(())
+}

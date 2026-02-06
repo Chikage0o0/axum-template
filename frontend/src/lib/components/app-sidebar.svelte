@@ -1,44 +1,52 @@
-<script lang="ts" module>
-  import LayoutDashboardIcon from "@lucide/svelte/icons/layout-dashboard";
-  import Settings2Icon from "@lucide/svelte/icons/settings-2";
-
-  const data = {
-    user: {
-      name: "管理员",
-      email: "admin@local",
-      avatar: "",
-    },
-    navMain: [
-      {
-        title: "仪表盘",
-        url: "/",
-        icon: LayoutDashboardIcon,
-      },
-      {
-        title: "设置",
-        url: "/settings",
-        icon: Settings2Icon,
-      },
-    ],
-  };
-</script>
-
 <script lang="ts">
   import CommandIcon from "@lucide/svelte/icons/command";
+  import LayoutDashboardIcon from "@lucide/svelte/icons/layout-dashboard";
+  import Settings2Icon from "@lucide/svelte/icons/settings-2";
+  import UsersIcon from "@lucide/svelte/icons/users";
   import type { ComponentProps } from "svelte";
   import NavMain from "./nav-main.svelte";
   import NavUser from "./nav-user.svelte";
   import * as Sidebar from "$lib/shadcn/components/ui/sidebar/index.js";
+  import type { AuthUser } from "$lib/types/auth-user";
+
+  const navMain = [
+    {
+      title: "仪表盘",
+      url: "/",
+      icon: LayoutDashboardIcon,
+    },
+    {
+      title: "设置",
+      url: "/settings",
+      icon: Settings2Icon,
+    },
+    {
+      title: "用户管理",
+      url: "/users",
+      icon: UsersIcon,
+    },
+  ];
 
   let {
     ref = $bindable(null),
     currentPath,
+    currentUser,
     onLogout,
     ...restProps
   }: ComponentProps<typeof Sidebar.Root> & {
     currentPath: string;
+    currentUser: AuthUser | null;
     onLogout: () => void;
   } = $props();
+
+  const sidebarUser = $derived.by(() => {
+    const displayName = currentUser?.displayName?.trim() || "当前用户";
+    return {
+      name: displayName,
+      email: currentUser?.email?.trim() || "未获取邮箱",
+      avatar: "",
+    };
+  });
 </script>
 
 <Sidebar.Root bind:ref variant="inset" {...restProps}>
@@ -65,10 +73,10 @@
   </Sidebar.Header>
 
   <Sidebar.Content>
-    <NavMain items={data.navMain} {currentPath} />
+    <NavMain items={navMain} {currentPath} />
   </Sidebar.Content>
 
   <Sidebar.Footer>
-    <NavUser user={data.user} {onLogout} />
+    <NavUser user={sidebarUser} {onLogout} />
   </Sidebar.Footer>
 </Sidebar.Root>

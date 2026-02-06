@@ -9,9 +9,10 @@ bun install
 bun run dev
 ```
 
-## 类型生成（可选）
+## OpenAPI 客户端生成（可选）
 
 ```bash
-bun run gen:openapi
-bun run gen:openapi:zod
+bun run gen:api
 ```
+
+`gen:api` 会同时生成请求函数客户端与前端表单校验用的 Zod schemas。

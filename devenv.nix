@@ -83,8 +83,8 @@ in
     echo "[fmt-check] frontend prettier --check"
     bun run --cwd frontend format:check
   '';
-  scripts.openapi-gen.exec = "cargo run --quiet -- --export-openapi > docs/openapi.json && (cd frontend && bun run gen:openapi && bun run gen:openapi:zod)";
-  scripts.openapi-check.exec = "cargo run --quiet -- --export-openapi > docs/openapi.json && (cd frontend && bun run gen:openapi && bun run gen:openapi:zod) && git diff --exit-code";
+  scripts.openapi-gen.exec = "cargo run --quiet -- --export-openapi > docs/openapi.json && (cd frontend && bun run gen:api)";
+  scripts.openapi-check.exec = "cargo run --quiet -- --export-openapi > docs/openapi.json && (cd frontend && bun run gen:api && bun run check:api-usage) && git diff --exit-code";
   scripts.frontend-dev.exec = "cd frontend && bun run dev";
   scripts.process-up.exec = "devenv processes up --detach";
   scripts.process-down.exec = "devenv processes down";

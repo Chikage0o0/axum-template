@@ -13,7 +13,6 @@ pub struct RuntimeConfig {
 #[derive(Debug, Clone)]
 pub struct SecurityRuntimeConfig {
     pub jwt_secret: String,
-    pub admin_password_hash: String,
 }
 
 #[derive(Debug, Clone)]
@@ -33,9 +32,6 @@ impl RuntimeConfig {
         let jwt_secret = get_required_string(pool, "security.jwt_secret")
             .await
             .context("加载 security.jwt_secret 失败")?;
-        let admin_password_hash = get_required_string(pool, "security.admin_password_hash")
-            .await
-            .context("加载 security.admin_password_hash 失败")?;
 
         let check_interval_secs = get_u64_with_default(pool, "app.check_interval_secs", 3600)
             .await
@@ -60,17 +56,8 @@ impl RuntimeConfig {
                 .await
                 .context("加载 integrations.example_api_key 失败")?;
 
-        if admin_password_hash.trim().is_empty() {
-            return Err(anyhow!(
-                "security.admin_password_hash 为空：请确认应用已成功启动并完成 seed"
-            ));
-        }
-
         Ok(Self {
-            security: SecurityRuntimeConfig {
-                jwt_secret,
-                admin_password_hash,
-            },
+            security: SecurityRuntimeConfig { jwt_secret },
             app: AppRuntimeConfig {
                 check_interval_secs,
                 welcome_message,

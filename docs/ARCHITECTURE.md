@@ -7,7 +7,7 @@
 - 统一错误体（JSON）
 - JWT 鉴权（Bearer Token）
 - 两阶段配置：启动期 env + 运行期 DB（`system_config`）
-- OpenAPI 作为规范中心（后端导出，前端生成类型）
+- OpenAPI 作为规范中心（后端导出，前端生成类型与 API 调用函数）
 
 ## 分层
 

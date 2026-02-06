@@ -5,7 +5,7 @@
 ## 目标
 
 - **后端**：Rust + Axum，内置 `x-request-id`、统一错误体、JWT 鉴权、参数校验（garde）、OpenAPI（规范中心）、运行期配置（DB: `system_config`）热更新。
-- **前端**：SvelteKit + Svelte 5 + Tailwind，包含登录页与设置页（读写 `/api/v1/settings`）。
+- **前端**：SvelteKit + Svelte 5 + Tailwind，包含用户名/密码登录页与设置页（读写 `/api/v1/settings`）。
 - **环境**：devenv 一键拉起 PostgreSQL + Rust 工具链 + Bun。
 
 ## 快速开始

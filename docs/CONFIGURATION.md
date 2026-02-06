@@ -13,6 +13,7 @@
 
 可选：
 
+- `SEED_ADMIN_USERNAME`：初始化管理员用户名（默认 `admin`）
 - `SEED_ADMIN_PASSWORD`：首次初始化管理员密码覆盖值（仅首次 seed 生效）
 - `PROJECT_NAME_AUTO_MIGRATE`：是否启动时自动迁移（默认 true）
 - `PROJECT_NAME_EXPOSE_OPENAPI`：是否暴露 OpenAPI/Swagger UI（默认 debug 开、release 关）
@@ -24,8 +25,11 @@
 示例 key：
 
 - `security.jwt_secret`
-- `security.admin_password_hash`
 - `app.check_interval_secs`
 - `app.welcome_message`
 - `integrations.example_api_base`
 - `integrations.example_api_key`
+
+说明：
+
+- `security.admin_password_hash` 已废弃，仅作为迁移来源保留；当前登录密码存储在 `users.password_hash`。

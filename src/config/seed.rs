@@ -1,10 +1,14 @@
+use crate::db::DbPool;
 use anyhow::{anyhow, Context, Result};
 use argon2::password_hash::rand_core::{OsRng, RngCore};
 
-use crate::db::DbPool;
-
 #[derive(Debug, Clone)]
 pub struct SeedOptions {
+    /// 可选覆盖：初始化管理员用户名，默认 `admin`。
+    ///
+    /// 约定环境变量：SEED_ADMIN_USERNAME
+    pub seed_admin_username: Option<String>,
+
     /// 可选覆盖：仅在首次初始化管理员密码时使用。
     ///
     /// 约定环境变量：SEED_ADMIN_PASSWORD
@@ -14,6 +18,7 @@ pub struct SeedOptions {
 impl SeedOptions {
     pub fn from_env() -> Self {
         Self {
+            seed_admin_username: std::env::var("SEED_ADMIN_USERNAME").ok(),
             seed_admin_password: std::env::var("SEED_ADMIN_PASSWORD").ok(),
         }
     }
@@ -21,10 +26,10 @@ impl SeedOptions {
 
 /// 迁移后/启动时的幂等初始化：
 /// - 确保 `security.jwt_secret` 存在
-/// - 确保 `security.admin_password_hash` 存在（Argon2id PHC）
+/// - 确保管理员用户（默认 `admin`）存在可用密码哈希
 pub async fn seed_if_needed(pool: &DbPool, opts: &SeedOptions) -> Result<()> {
     ensure_jwt_secret_exists(pool).await?;
-    ensure_admin_password_hash_exists(pool, opts).await?;
+    ensure_admin_user_password_hash_exists(pool, opts).await?;
     Ok(())
 }
 
@@ -66,91 +71,159 @@ RETURNING key
     Ok(())
 }
 
-async fn ensure_admin_password_hash_exists(pool: &DbPool, opts: &SeedOptions) -> Result<()> {
-    let existing_value: Option<serde_json::Value> = sqlx::query_scalar(
+#[derive(sqlx::FromRow)]
+struct AdminUserRow {
+    password_hash: Option<String>,
+}
+
+async fn ensure_admin_user_password_hash_exists(pool: &DbPool, opts: &SeedOptions) -> Result<()> {
+    let username = resolve_admin_username(opts);
+    let existing_user = load_admin_user(pool, &username).await?;
+
+    if let Some(user) = &existing_user {
+        if user
+            .password_hash
+            .as_deref()
+            .is_some_and(|s| !s.trim().is_empty())
+        {
+            return Ok(());
+        }
+    }
+
+    if let Some(legacy_hash) = load_legacy_admin_password_hash(pool).await? {
+        upsert_admin_user_password_hash(pool, &username, &legacy_hash)
+            .await
+            .context("迁移 legacy admin 密码到 users 失败")?;
+        tracing::info!("已将 security.admin_password_hash 迁移到用户 {username}");
+        return Ok(());
+    }
+
+    let (password, should_print) = match opts.seed_admin_password.as_ref() {
+        Some(p) if !p.trim().is_empty() => (p.clone(), false),
+        _ => (generate_random_password()?, true),
+    };
+    let password_hash = crate::password::hash_password_argon2id(&password)?;
+
+    upsert_admin_user_password_hash(pool, &username, &password_hash)
+        .await
+        .context("初始化管理员用户密码失败")?;
+
+    if should_print {
+        tracing::warn!(
+            "已生成管理员初始密码（用户: {}，仅打印一次，请立即修改/妥善保存）：{}",
+            username,
+            password
+        );
+    } else {
+        tracing::info!("已使用 SEED_ADMIN_PASSWORD 初始化管理员用户密码（用户: {username}）");
+    }
+
+    Ok(())
+}
+
+fn resolve_admin_username(opts: &SeedOptions) -> String {
+    opts.seed_admin_username
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("admin")
+        .to_string()
+}
+
+async fn load_admin_user(pool: &DbPool, username: &str) -> Result<Option<AdminUserRow>> {
+    let user = sqlx::query_as::<_, AdminUserRow>(
+        r#"
+SELECT password_hash
+FROM users
+WHERE username = $1
+LIMIT 1
+        "#,
+    )
+    .bind(username)
+    .fetch_optional(pool)
+    .await
+    .context("查询管理员用户失败")?;
+
+    Ok(user)
+}
+
+async fn load_legacy_admin_password_hash(pool: &DbPool) -> Result<Option<String>> {
+    let value: Option<serde_json::Value> = sqlx::query_scalar(
         "SELECT value FROM system_config WHERE key = 'security.admin_password_hash'",
     )
     .fetch_optional(pool)
     .await
     .context("读取 security.admin_password_hash 失败")?;
 
-    enum SeedMode {
-        Insert,
-        UpdateEmpty,
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let Some(hash) = value.as_str() else {
+        return Err(anyhow!(
+            "security.admin_password_hash 类型错误：期望 string（Argon2id PHC）"
+        ));
+    };
+
+    let hash = hash.trim();
+    if hash.is_empty() {
+        return Ok(None);
     }
 
-    let mode = match existing_value {
-        None => SeedMode::Insert,
-        Some(v) => {
-            if v.is_null() {
-                SeedMode::UpdateEmpty
-            } else if let Some(s) = v.as_str() {
-                if s.trim().is_empty() {
-                    SeedMode::UpdateEmpty
-                } else {
-                    return Ok(());
-                }
-            } else {
-                return Err(anyhow!(
-                    "security.admin_password_hash 类型错误：期望 string（Argon2id PHC）"
-                ));
-            }
-        }
-    };
+    Ok(Some(hash.to_string()))
+}
 
-    let (password, should_print) = match opts.seed_admin_password.as_ref() {
-        Some(p) if !p.trim().is_empty() => (p.clone(), false),
-        _ => (generate_random_password()?, true),
-    };
-
-    let password_hash = crate::password::hash_password_argon2id(&password)?;
-
-    let changed: Option<String> = match mode {
-        SeedMode::Insert => sqlx::query_scalar(
-            r#"
-INSERT INTO system_config (key, value, description)
-VALUES ($1, $2, $3)
-ON CONFLICT (key) DO NOTHING
-RETURNING key
-"#,
-        )
-        .bind("security.admin_password_hash")
-        .bind(serde_json::Value::String(password_hash))
-        .bind("管理员密码 Argon2id 哈希（PHC 格式）")
-        .fetch_optional(pool)
+async fn upsert_admin_user_password_hash(
+    pool: &DbPool,
+    username: &str,
+    password_hash: &str,
+) -> Result<()> {
+    let default_email = format!("{username}@local.invalid");
+    if try_upsert_admin_user(pool, username, &default_email, password_hash)
         .await
-        .context("写入 security.admin_password_hash 失败")?,
-        SeedMode::UpdateEmpty => sqlx::query_scalar(
-            r#"
-UPDATE system_config
-SET value = $2,
+        .is_ok()
+    {
+        return Ok(());
+    }
+
+    let mut suffix = [0u8; 4];
+    OsRng.fill_bytes(&mut suffix);
+    let fallback_email = format!("{username}+{}@local.invalid", hex_encode(&suffix));
+    try_upsert_admin_user(pool, username, &fallback_email, password_hash)
+        .await
+        .context("创建管理员用户失败（默认与回退邮箱均不可用）")?;
+    Ok(())
+}
+
+async fn try_upsert_admin_user(
+    pool: &DbPool,
+    username: &str,
+    email: &str,
+    password_hash: &str,
+) -> Result<()> {
+    sqlx::query(
+        r#"
+INSERT INTO users (
+    username,
+    display_name,
+    email,
+    is_active,
+    metadata,
+    password_hash
+)
+VALUES ($1, $2, $3, TRUE, '{}'::jsonb, $4)
+ON CONFLICT (username) DO UPDATE
+SET password_hash = COALESCE(NULLIF(users.password_hash, ''), EXCLUDED.password_hash),
+    is_active = TRUE,
     updated_at = NOW()
-WHERE key = $1
-  AND (
-       (jsonb_typeof(value) = 'string' AND trim(btrim(value::text, '"')) = '')
-       OR jsonb_typeof(value) = 'null'
-  )
-RETURNING key
-"#,
-        )
-        .bind("security.admin_password_hash")
-        .bind(serde_json::Value::String(password_hash))
-        .fetch_optional(pool)
-        .await
-        .context("修复空的 security.admin_password_hash 失败")?,
-    };
-
-    if changed.is_some() {
-        if should_print {
-            tracing::warn!(
-                "已生成管理员初始密码（仅打印一次，请立即修改/妥善保存）：{}",
-                password
-            );
-        } else {
-            tracing::info!("已使用 SEED_ADMIN_PASSWORD 初始化管理员密码（未打印明文）");
-        }
-    }
-
+        "#,
+    )
+    .bind(username)
+    .bind("Administrator")
+    .bind(email)
+    .bind(password_hash)
+    .execute(pool)
+    .await
+    .context("upsert 管理员用户失败")?;
     Ok(())
 }
 

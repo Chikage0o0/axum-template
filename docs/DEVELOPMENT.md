@@ -29,8 +29,16 @@ cargo run -- --export-openapi > docs/openapi.json
 
 ```bash
 cd frontend
-bun run gen:openapi
-bun run gen:openapi:zod
+bun run gen:api
+```
+
+说明：`gen:api` 会同时生成 API 调用函数与 Zod schemas，前端提交前校验统一复用该 schemas。
+
+接口调用约束检查：
+
+```bash
+cd frontend
+bun run check:api-usage
 ```
 
 ## 4. 提交前检查

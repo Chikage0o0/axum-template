@@ -12,7 +12,9 @@ use crate::api::request_id::current_request_id;
 #[derive(Debug, Error)]
 pub enum AppError {
     #[error("身份验证失败: {0}")]
-    AuthError(String),
+    AuthTokenError(String),
+    #[error("身份验证失败: {0}")]
+    AuthCredentialError(String),
     #[error("权限不足: {0}")]
     PermissionDenied(String),
     #[error("验证失败: {message}")]
@@ -29,6 +31,14 @@ pub enum AppError {
 }
 
 impl AppError {
+    pub fn auth_token(message: impl Into<String>) -> Self {
+        Self::AuthTokenError(message.into())
+    }
+
+    pub fn auth_credential(message: impl Into<String>) -> Self {
+        Self::AuthCredentialError(message.into())
+    }
+
     pub fn validation(message: impl Into<String>) -> Self {
         Self::ValidationError {
             message: message.into(),
@@ -61,7 +71,8 @@ impl AppError {
     pub fn error_code(&self) -> u16 {
         match self {
             AppError::ValidationError { .. } => 1000,
-            AppError::AuthError(_) => 1001,
+            AppError::AuthTokenError(_) => 1001,
+            AppError::AuthCredentialError(_) => 1002,
             AppError::PermissionDenied(_) => 2002,
             AppError::NotFound(_) => 2000,
             AppError::InternalError(_) => 5000,
@@ -71,7 +82,8 @@ impl AppError {
 
     pub fn status_code(&self) -> StatusCode {
         match self {
-            AppError::AuthError(_) => StatusCode::UNAUTHORIZED,
+            AppError::AuthTokenError(_) => StatusCode::UNAUTHORIZED,
+            AppError::AuthCredentialError(_) => StatusCode::UNAUTHORIZED,
             AppError::PermissionDenied(_) => StatusCode::FORBIDDEN,
             AppError::ValidationError { .. } => StatusCode::BAD_REQUEST,
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
@@ -109,5 +121,20 @@ impl IntoResponse for AppError {
         });
 
         (status, body).into_response()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AppError;
+
+    #[test]
+    fn token_auth_error_should_use_1001() {
+        assert_eq!(AppError::auth_token("token 无效").error_code(), 1001);
+    }
+
+    #[test]
+    fn credential_auth_error_should_use_1002() {
+        assert_eq!(AppError::auth_credential("密码错误").error_code(), 1002);
     }
 }

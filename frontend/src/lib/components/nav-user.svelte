@@ -19,6 +19,11 @@
   } = $props();
 
   const sidebar = useSidebar();
+  const fallback = $derived.by(() => {
+    const name = user.name.trim();
+    if (!name) return "U";
+    return name.slice(0, 1).toUpperCase();
+  });
 </script>
 
 <Sidebar.Menu>
@@ -33,7 +38,7 @@
           >
             <Avatar.Root class="size-8 rounded-lg">
               <Avatar.Image src={user.avatar} alt={user.name} />
-              <Avatar.Fallback class="rounded-lg">AD</Avatar.Fallback>
+              <Avatar.Fallback class="rounded-lg">{fallback}</Avatar.Fallback>
             </Avatar.Root>
             <div class="grid flex-1 text-start text-sm leading-tight">
               <span class="truncate font-medium">{user.name}</span>
@@ -54,7 +59,7 @@
           <div class="flex items-center gap-2 px-1 py-1.5 text-start text-sm">
             <Avatar.Root class="size-8 rounded-lg">
               <Avatar.Image src={user.avatar} alt={user.name} />
-              <Avatar.Fallback class="rounded-lg">AD</Avatar.Fallback>
+              <Avatar.Fallback class="rounded-lg">{fallback}</Avatar.Fallback>
             </Avatar.Root>
             <div class="grid flex-1 text-start text-sm leading-tight">
               <span class="truncate font-medium">{user.name}</span>
