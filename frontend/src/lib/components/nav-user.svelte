@@ -1,6 +1,7 @@
 <script lang="ts">
   import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
   import LogOutIcon from "@lucide/svelte/icons/log-out";
+  import { AvatarBeam } from "svelte-boring-avatars";
   import * as Avatar from "$lib/shadcn/components/ui/avatar/index.js";
   import * as DropdownMenu from "$lib/shadcn/components/ui/dropdown-menu/index.js";
   import * as Sidebar from "$lib/shadcn/components/ui/sidebar/index.js";
@@ -19,10 +20,22 @@
   } = $props();
 
   const sidebar = useSidebar();
-  const fallback = $derived.by(() => {
+  const beamColors = [
+    "var(--sidebar-primary)",
+    "var(--chart-1)",
+    "var(--chart-2)",
+    "var(--chart-3)",
+    "var(--chart-4)",
+  ];
+
+  const fallbackSeed = $derived.by(() => {
+    const email = user.email.trim();
+    if (email) return email;
+
     const name = user.name.trim();
-    if (!name) return "U";
-    return name.slice(0, 1).toUpperCase();
+    if (name) return name;
+
+    return "current-user";
   });
 </script>
 
@@ -38,7 +51,11 @@
           >
             <Avatar.Root class="size-8 rounded-lg">
               <Avatar.Image src={user.avatar} alt={user.name} />
-              <Avatar.Fallback class="rounded-lg">{fallback}</Avatar.Fallback>
+              <Avatar.Fallback class="rounded-lg p-0">
+                {#key fallbackSeed}
+                  <AvatarBeam size={32} name={fallbackSeed} square={true} colors={beamColors} />
+                {/key}
+              </Avatar.Fallback>
             </Avatar.Root>
             <div class="grid flex-1 text-start text-sm leading-tight">
               <span class="truncate font-medium">{user.name}</span>
@@ -59,7 +76,11 @@
           <div class="flex items-center gap-2 px-1 py-1.5 text-start text-sm">
             <Avatar.Root class="size-8 rounded-lg">
               <Avatar.Image src={user.avatar} alt={user.name} />
-              <Avatar.Fallback class="rounded-lg">{fallback}</Avatar.Fallback>
+              <Avatar.Fallback class="rounded-lg p-0">
+                {#key fallbackSeed}
+                  <AvatarBeam size={32} name={fallbackSeed} square={true} colors={beamColors} />
+                {/key}
+              </Avatar.Fallback>
             </Avatar.Root>
             <div class="grid flex-1 text-start text-sm leading-tight">
               <span class="truncate font-medium">{user.name}</span>
