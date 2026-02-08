@@ -3,6 +3,35 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script>
+      ;(() => {
+        // 目的：在 Svelte/ModeWatcher 启动前就设置 <html> 的主题，避免暗黑模式硬刷新闪屏。
+        // 说明：本项目为纯 CSR，若等到组件 onMount 才应用主题，会先以亮色渲染一帧。
+        try {
+          const MODE_KEY = "mode-watcher-mode";
+          const THEME_KEY = "mode-watcher-theme";
+
+          const storedMode = localStorage.getItem(MODE_KEY);
+          const mode = storedMode === "light" || storedMode === "dark" || storedMode === "system" ? storedMode : "system";
+
+          const prefersLight =
+            typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: light)").matches;
+
+          const isLight = mode === "light" || (mode === "system" && prefersLight);
+
+          const root = document.documentElement;
+          root.classList.toggle("dark", !isLight);
+          root.style.colorScheme = isLight ? "light" : "dark";
+
+          const theme = localStorage.getItem(THEME_KEY);
+          if (theme) {
+            root.setAttribute("data-theme", theme);
+          }
+        } catch {
+          // localStorage 可能被禁用（隐私模式/浏览器策略），此时保持默认主题即可。
+        }
+      })();
+    </script>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">

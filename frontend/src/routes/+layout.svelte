@@ -89,7 +89,7 @@
   }
 </script>
 
-<ModeWatcher />
+<ModeWatcher disableHeadScriptInjection />
 <Toaster position="top-center" />
 
 {#if isLoginRoute}
