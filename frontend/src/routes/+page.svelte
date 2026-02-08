@@ -3,7 +3,7 @@
   import * as Card from "$lib/shadcn/components/ui/card/index.js";
 </script>
 
-<div class="space-y-6">
+<div class="content-flow space-y-6">
   <div>
     <h1 class="text-2xl font-semibold tracking-tight">仪表盘</h1>
   </div>

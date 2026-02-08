@@ -94,9 +94,11 @@
 
 {#if isLoginRoute}
   <main class="aurora-surface flex min-h-dvh w-full items-center justify-center px-4">
-    <div class="w-full max-w-md space-y-4">
-      {@render children()}
-    </div>
+    {#key pathname}
+      <div class="route-enter route-enter--auth w-full max-w-md space-y-4">
+        {@render children()}
+      </div>
+    {/key}
   </main>
 {:else}
   <Sidebar.Provider>
@@ -131,7 +133,11 @@
 
       <div class="flex flex-1 flex-col p-4">
         <main class="flex-1">
-          {@render children()}
+          {#key pathname}
+            <section class="route-enter">
+              {@render children()}
+            </section>
+          {/key}
         </main>
       </div>
     </Sidebar.Inset>

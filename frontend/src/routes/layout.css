@@ -6,6 +6,8 @@
 
 :root {
   --radius: 0.65rem;
+  --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-snappy: cubic-bezier(0.2, 0.8, 0.3, 1);
   --background: oklch(0.951 0.007 260.732);
   --foreground: oklch(0.324 0.023 264.182);
   --card: oklch(0.933 0.01 261.788);
@@ -135,6 +137,16 @@
       color-mix(in oklch, var(--background) 95%, var(--chart-3) 5%)
     );
   background-repeat: no-repeat;
+  background-position:
+    14% 14%,
+    84% 12%,
+    76% 86%,
+    50% 50%;
+  background-size:
+    150% 150%,
+    150% 150%,
+    150% 150%,
+    100% 100%;
   background-attachment: fixed;
 }
 
@@ -160,6 +172,144 @@
       color-mix(in oklch, var(--background) 92%, black 8%),
       color-mix(in oklch, var(--background) 88%, var(--chart-3) 12%)
     );
+  background-position:
+    14% 18%,
+    88% 10%,
+    76% 86%,
+    50% 50%;
+}
+
+.route-enter {
+  animation: route-enter 360ms var(--ease-smooth) both;
+  transform-origin: center top;
+  will-change: transform, opacity;
+}
+
+.route-enter--auth {
+  animation-duration: 420ms;
+}
+
+.content-flow > * {
+  opacity: 0;
+  animation: content-stagger 460ms var(--ease-smooth) both;
+}
+
+.content-flow > *:nth-child(1) {
+  animation-delay: 40ms;
+}
+
+.content-flow > *:nth-child(2) {
+  animation-delay: 100ms;
+}
+
+.content-flow > *:nth-child(3) {
+  animation-delay: 160ms;
+}
+
+.content-flow > *:nth-child(4) {
+  animation-delay: 220ms;
+}
+
+.content-flow > *:nth-child(5) {
+  animation-delay: 280ms;
+}
+
+[data-slot="card"] {
+  transition:
+    transform 260ms var(--ease-smooth),
+    box-shadow 260ms var(--ease-smooth),
+    border-color 220ms var(--ease-snappy);
+}
+
+[data-slot="button"] {
+  transition:
+    transform 180ms var(--ease-snappy),
+    box-shadow 180ms var(--ease-snappy);
+}
+
+[data-slot="sidebar-menu-button"] {
+  transition-property: width, height, padding, color, background-color, transform;
+  transition-duration: 180ms;
+  transition-timing-function: var(--ease-snappy);
+}
+
+[data-slot="sidebar-menu"] > [data-slot="sidebar-menu-item"] [data-slot="sidebar-menu-button"] {
+  opacity: 0;
+  animation: sidebar-item-enter 380ms var(--ease-smooth) both;
+}
+
+[data-slot="sidebar-menu"] > [data-slot="sidebar-menu-item"]:nth-child(1) [data-slot="sidebar-menu-button"] {
+  animation-delay: 70ms;
+}
+
+[data-slot="sidebar-menu"] > [data-slot="sidebar-menu-item"]:nth-child(2) [data-slot="sidebar-menu-button"] {
+  animation-delay: 130ms;
+}
+
+[data-slot="sidebar-menu"] > [data-slot="sidebar-menu-item"]:nth-child(3) [data-slot="sidebar-menu-button"] {
+  animation-delay: 190ms;
+}
+
+[data-slot="sidebar-menu-button"][data-active="true"] {
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--sidebar-primary) 30%, transparent);
+}
+
+[data-slot="button"]:active {
+  transform: translateY(0);
+}
+
+@keyframes route-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.996);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes content-stagger {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sidebar-item-enter {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-surface,
+  .route-enter,
+  .route-enter--auth,
+  .content-flow > *,
+  [data-slot="sidebar-menu"] > [data-slot="sidebar-menu-item"] [data-slot="sidebar-menu-button"] {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  [data-slot="card"],
+  [data-slot="button"],
+  [data-slot="sidebar-menu-button"] {
+    transition: none !important;
+  }
 }
 
 [data-sonner-toast][data-type="success"] [data-icon] {
