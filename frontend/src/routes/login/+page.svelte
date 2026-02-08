@@ -13,6 +13,7 @@
   } from "$lib/forms/field-errors";
   import { ApiError } from "$lib/api/mutator";
   import { auth } from "$lib/stores/auth";
+  import PasswordInput from "$lib/components/password-input.svelte";
   import { Button } from "$lib/shadcn/components/ui/button/index.js";
   import * as Card from "$lib/shadcn/components/ui/card/index.js";
   import * as Field from "$lib/shadcn/components/ui/field/index.js";
@@ -89,9 +90,8 @@
 
       <Field.Field data-invalid={invalid("password") || undefined}>
         <Field.Label for="password">密码</Field.Label>
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
           bind:value={password}
           autocomplete="current-password"
           disabled={submitting}

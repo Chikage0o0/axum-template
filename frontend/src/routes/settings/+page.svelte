@@ -23,6 +23,7 @@
     zodErrorToFieldErrors,
   } from "$lib/forms/field-errors";
   import { auth } from "$lib/stores/auth";
+  import PasswordInput from "$lib/components/password-input.svelte";
   import * as Alert from "$lib/shadcn/components/ui/alert/index.js";
   import { Button } from "$lib/shadcn/components/ui/button/index.js";
   import * as Card from "$lib/shadcn/components/ui/card/index.js";
@@ -282,9 +283,8 @@
               >integrations.example_api_key</Field.Label
             >
             <Field.Description>留空不修改</Field.Description>
-            <Input
+            <PasswordInput
               id="example_api_key"
-              type="password"
               bind:value={exampleApiKey}
               placeholder={settings.integrations.example_api_key_is_set
                 ? "已设置"
@@ -314,9 +314,8 @@
       >
         <Field.Field data-invalid={invalidPassword("current_password") || undefined}>
           <Field.Label for="current_password">当前用户密码</Field.Label>
-          <Input
+          <PasswordInput
             id="current_password"
-            type="password"
             bind:value={currentPassword}
             disabled={changing}
             autocomplete="current-password"
@@ -328,9 +327,8 @@
         <Field.Field data-invalid={invalidPassword("new_password") || undefined}>
           <Field.Label for="new_password">新密码</Field.Label>
           <Field.Description>至少 8 位</Field.Description>
-          <Input
+          <PasswordInput
             id="new_password"
-            type="password"
             bind:value={newPassword}
             disabled={changing}
             autocomplete="new-password"
@@ -341,9 +339,8 @@
 
         <Field.Field data-invalid={invalidPassword("confirm_password") || undefined}>
           <Field.Label for="confirm_password">确认新密码</Field.Label>
-          <Input
+          <PasswordInput
             id="confirm_password"
-            type="password"
             bind:value={confirmPassword}
             disabled={changing}
             autocomplete="new-password"
