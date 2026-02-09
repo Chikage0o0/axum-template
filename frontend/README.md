@@ -1,6 +1,6 @@
 # PROJECT_NAME Frontend
 
-最小前端：`/login` + `/settings`。
+最小前端：`/login` + `/`（仪表盘）+ `/settings`。
 
 ## 开发
 

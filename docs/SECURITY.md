@@ -13,4 +13,4 @@
 
 ## 3. 密钥轮换
 
-修改管理员密码时同时轮换 JWT secret，使旧 token 立即失效。
+修改当前登录用户密码（`PATCH /api/v1/security/password`）时会同时轮换 JWT secret，使旧 token 立即失效。
