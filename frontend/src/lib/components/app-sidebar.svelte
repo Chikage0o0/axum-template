@@ -2,7 +2,6 @@
   import CommandIcon from "@lucide/svelte/icons/command";
   import LayoutDashboardIcon from "@lucide/svelte/icons/layout-dashboard";
   import Settings2Icon from "@lucide/svelte/icons/settings-2";
-  import UsersIcon from "@lucide/svelte/icons/users";
   import type { ComponentProps } from "svelte";
   import NavMain from "./nav-main.svelte";
   import NavUser from "./nav-user.svelte";
@@ -19,11 +18,6 @@
       title: "设置",
       url: "/settings",
       icon: Settings2Icon,
-    },
-    {
-      title: "用户管理",
-      url: "/users",
-      icon: UsersIcon,
     },
   ];
 

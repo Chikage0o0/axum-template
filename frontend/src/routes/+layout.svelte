@@ -2,12 +2,14 @@
   import "./layout.css";
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
+  import MonitorIcon from "@lucide/svelte/icons/monitor";
   import MoonIcon from "@lucide/svelte/icons/moon";
   import SunIcon from "@lucide/svelte/icons/sun";
   import { toast } from "svelte-sonner";
   import AppSidebar from "$lib/components/app-sidebar.svelte";
   import * as Breadcrumb from "$lib/shadcn/components/ui/breadcrumb/index.js";
   import { Button } from "$lib/shadcn/components/ui/button/index.js";
+  import * as DropdownMenu from "$lib/shadcn/components/ui/dropdown-menu/index.js";
   import { Separator } from "$lib/shadcn/components/ui/separator/index.js";
   import { Toaster } from "$lib/shadcn/components/ui/sonner/index.js";
   import * as Sidebar from "$lib/shadcn/components/ui/sidebar/index.js";
@@ -15,7 +17,7 @@
   import { setupZodErrorMap } from "$lib/forms/zod-error-map";
   import { auth } from "$lib/stores/auth";
   import { toAuthUser } from "$lib/utils/user-helpers";
-  import { ModeWatcher, toggleMode } from "mode-watcher";
+  import { ModeWatcher, mode, setMode, userPrefersMode } from "mode-watcher";
 
   setupZodErrorMap();
 
@@ -24,13 +26,20 @@
   let isLoginRoute = $derived(page.url.pathname.startsWith("/login"));
   let pathname = $derived(page.url.pathname);
   let syncedToken = $state<string | null>(null);
+  type ThemeMode = "light" | "dark" | "system";
+  let preferredMode = $derived(userPrefersMode.current as ThemeMode);
+  let appliedMode = $derived(mode.current ?? "light");
+  let themeModeLabel = $derived.by(() => {
+    if (preferredMode === "system") {
+      return `跟随系统（当前${appliedMode === "dark" ? "深色" : "浅色"}）`;
+    }
+
+    return preferredMode === "dark" ? "深色" : "浅色";
+  });
 
   let breadcrumb = $derived.by(() => {
     if (pathname === "/settings") {
       return { section: "管理", page: "设置" };
-    }
-    if (pathname.startsWith("/users")) {
-      return { section: "管理", page: "用户管理" };
     }
 
     return { section: "管理", page: "仪表盘" };
@@ -87,6 +96,10 @@
     auth.logout({ reason: "manual" });
     await goto("/login");
   }
+
+  function setThemeMode(nextMode: ThemeMode) {
+    setMode(nextMode);
+  }
 </script>
 
 <ModeWatcher disableHeadScriptInjection />
@@ -123,14 +136,46 @@
           </div>
 
           <div class="flex items-center gap-2">
-            <Button variant="outline" size="icon" onclick={toggleMode} aria-label="切换主题">
-              <SunIcon
-                class="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0"
-              />
-              <MoonIcon
-                class="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100"
-              />
-            </Button>
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger>
+                {#snippet child({ props })}
+                  <Button
+                    {...props}
+                    variant="outline"
+                    size="icon"
+                    aria-label={`主题模式：${themeModeLabel}`}
+                    title={`主题模式：${themeModeLabel}`}
+                  >
+                    {#if preferredMode === "system"}
+                      <MonitorIcon class="size-4" />
+                    {:else if appliedMode === "dark"}
+                      <MoonIcon class="size-4" />
+                    {:else}
+                      <SunIcon class="size-4" />
+                    {/if}
+                  </Button>
+                {/snippet}
+              </DropdownMenu.Trigger>
+
+              <DropdownMenu.Content align="end" sideOffset={8}>
+                <DropdownMenu.Label>主题模式</DropdownMenu.Label>
+                <DropdownMenu.Separator />
+                <DropdownMenu.RadioGroup value={preferredMode}>
+                  <DropdownMenu.RadioItem value="light" onclick={() => setThemeMode("light")}>
+                    <SunIcon />
+                    浅色
+                  </DropdownMenu.RadioItem>
+                  <DropdownMenu.RadioItem value="dark" onclick={() => setThemeMode("dark")}>
+                    <MoonIcon />
+                    深色
+                  </DropdownMenu.RadioItem>
+                  <DropdownMenu.RadioItem value="system" onclick={() => setThemeMode("system")}>
+                    <MonitorIcon />
+                    跟随系统
+                  </DropdownMenu.RadioItem>
+                </DropdownMenu.RadioGroup>
+              </DropdownMenu.Content>
+            </DropdownMenu.Root>
           </div>
         </div>
       </header>

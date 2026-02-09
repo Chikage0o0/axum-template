@@ -1,17 +1,14 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
   import { onMount } from "svelte";
   import { toast } from "svelte-sonner";
   import { ApiError } from "$lib/api/mutator";
   import {
     getSettingsHandler,
-    patchCurrentUserPasswordHandler,
     patchSettingsHandler,
     type PatchSettingsRequest as PatchSettingsRequestDto,
     type SettingsResponse,
   } from "$lib/api/generated/client";
   import { PatchSettingsRequest as PatchSettingsRequestSchema } from "$lib/api/generated/schemas";
-  import { validatePasswordChangeForm } from "$lib/forms/password-change";
   import {
     detailsToFieldErrors,
     hasFieldError,
@@ -20,7 +17,6 @@
     type FieldErrors,
     zodErrorToFieldErrors,
   } from "$lib/forms/field-errors";
-  import { auth } from "$lib/stores/auth";
   import PasswordInput from "$lib/components/password-input.svelte";
   import * as Alert from "$lib/shadcn/components/ui/alert/index.js";
   import { Button } from "$lib/shadcn/components/ui/button/index.js";
@@ -153,52 +149,6 @@
     }
   }
 
-  let currentPassword = $state("");
-  let newPassword = $state("");
-  let confirmPassword = $state("");
-  let changing = $state(false);
-  let passwordFieldErrors = $state<FieldErrors>({});
-
-  function invalidPassword(...keys: string[]): boolean {
-    return hasFieldError(passwordFieldErrors, ...keys);
-  }
-
-  function passwordErrorItems(...keys: string[]) {
-    return toFieldErrorItems(passwordFieldErrors, ...keys);
-  }
-
-  async function changePassword() {
-    const { payload, errors } = validatePasswordChangeForm({
-      currentPassword,
-      newPassword,
-      confirmPassword,
-    });
-    passwordFieldErrors = errors;
-
-    if (!payload) {
-      return;
-    }
-
-    changing = true;
-    try {
-      await patchCurrentUserPasswordHandler(payload);
-      toast.success("密码已更新，请重新登录");
-      auth.logout({ reason: "manual" });
-      await goto("/login");
-    } catch (e) {
-      if (e instanceof ApiError) {
-        const mapped = detailsToFieldErrors(e.body?.details);
-        passwordFieldErrors = mergeFieldErrors(passwordFieldErrors, mapped);
-        if (Object.keys(mapped).length > 0) {
-          return;
-        }
-      }
-      toast.error(e instanceof Error ? e.message : "修改失败");
-    } finally {
-      changing = false;
-    }
-  }
-
   onMount(() => {
     void reload();
   });
@@ -300,64 +250,6 @@
       {:else}
         <p class="text-muted-foreground text-sm">尚未加载配置。</p>
       {/if}
-    </Card.Content>
-  </Card.Root>
-
-  <Card.Root>
-    <Card.Header>
-      <Card.Title>修改当前用户密码</Card.Title>
-    </Card.Header>
-    <Card.Content>
-      <form
-        class="grid gap-4"
-        onsubmit={(e: SubmitEvent) => {
-          e.preventDefault();
-          void changePassword();
-        }}
-      >
-        <Field.Field data-invalid={invalidPassword("current_password") || undefined}>
-          <Field.Label for="current_password">当前用户密码</Field.Label>
-          <PasswordInput
-            id="current_password"
-            bind:value={currentPassword}
-            disabled={changing}
-            autocomplete="current-password"
-            aria-invalid={invalidPassword("current_password")}
-          />
-          <Field.Error errors={passwordErrorItems("current_password")} />
-        </Field.Field>
-
-        <Field.Field data-invalid={invalidPassword("new_password") || undefined}>
-          <Field.Label for="new_password">新密码</Field.Label>
-          <Field.Description>至少 8 位</Field.Description>
-          <PasswordInput
-            id="new_password"
-            bind:value={newPassword}
-            disabled={changing}
-            autocomplete="new-password"
-            aria-invalid={invalidPassword("new_password")}
-          />
-          <Field.Error errors={passwordErrorItems("new_password")} />
-        </Field.Field>
-
-        <Field.Field data-invalid={invalidPassword("confirm_password") || undefined}>
-          <Field.Label for="confirm_password">确认新密码</Field.Label>
-          <PasswordInput
-            id="confirm_password"
-            bind:value={confirmPassword}
-            disabled={changing}
-            autocomplete="new-password"
-            aria-invalid={invalidPassword("confirm_password")}
-          />
-          <Field.Error errors={passwordErrorItems("confirm_password")} />
-        </Field.Field>
-
-        <div class="flex justify-end">
-          <Button type="submit" disabled={changing}>
-            {changing ? "更新中..." : "更新密码"}
-          </Button>
-        </div>
-      </form>
     </Card.Content>
   </Card.Root>
 </div>

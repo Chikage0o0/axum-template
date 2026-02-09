@@ -15,7 +15,6 @@
     <Card.Content>
       <div class="flex flex-wrap gap-2">
         <Button href="/settings">进入设置</Button>
-        <Button href="/users" variant="outline">用户管理</Button>
       </div>
     </Card.Content>
   </Card.Root>
