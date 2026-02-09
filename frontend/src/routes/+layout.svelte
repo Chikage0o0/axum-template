@@ -16,6 +16,7 @@
   import { getCurrentUserHandler } from "$lib/api/generated/client";
   import { setupZodErrorMap } from "$lib/forms/zod-error-map";
   import { auth } from "$lib/stores/auth";
+  import { composeDocumentTitleFromPageData } from "$lib/utils/page-title";
   import { toAuthUser } from "$lib/utils/user-helpers";
   import { ModeWatcher, mode, setMode, userPrefersMode } from "mode-watcher";
 
@@ -25,6 +26,7 @@
 
   let isLoginRoute = $derived(page.url.pathname.startsWith("/login"));
   let pathname = $derived(page.url.pathname);
+  let documentTitle = $derived(composeDocumentTitleFromPageData(page.data));
   let syncedToken = $state<string | null>(null);
   type ThemeMode = "light" | "dark" | "system";
   let preferredMode = $derived(userPrefersMode.current as ThemeMode);
@@ -101,6 +103,10 @@
     setMode(nextMode);
   }
 </script>
+
+<svelte:head>
+  <title>{documentTitle}</title>
+</svelte:head>
 
 <ModeWatcher disableHeadScriptInjection />
 <Toaster position="top-center" />

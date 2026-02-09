@@ -1,0 +1,7 @@
+import type { PageLoad } from "./$types";
+
+export const load: PageLoad = () => {
+  return {
+    pageTitle: "仪表盘",
+  };
+};
