@@ -18,8 +18,7 @@ function readTokenFromStorage(): string | null {
   }
 }
 
-const initialToken =
-  typeof window === "undefined" ? null : readTokenFromStorage();
+const initialToken = typeof window === "undefined" ? null : readTokenFromStorage();
 
 const store = writable<AuthState>({
   isAuthenticated: Boolean(initialToken),

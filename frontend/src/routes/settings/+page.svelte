@@ -10,9 +10,7 @@
     type PatchSettingsRequest as PatchSettingsRequestDto,
     type SettingsResponse,
   } from "$lib/api/generated/client";
-  import {
-    PatchSettingsRequest as PatchSettingsRequestSchema,
-  } from "$lib/api/generated/schemas";
+  import { PatchSettingsRequest as PatchSettingsRequestSchema } from "$lib/api/generated/schemas";
   import { validatePasswordChangeForm } from "$lib/forms/password-change";
   import {
     detailsToFieldErrors,
@@ -105,12 +103,10 @@
     try {
       const payload: PatchSettingsRequestDto = {};
       const app: NonNullable<PatchSettingsRequestDto["app"]> = {};
-      const integrations: NonNullable<PatchSettingsRequestDto["integrations"]> =
-        {};
+      const integrations: NonNullable<PatchSettingsRequestDto["integrations"]> = {};
 
       const interval = Math.trunc(intervalNum);
-      if (interval !== settings.app.check_interval_secs)
-        app.check_interval_secs = interval;
+      if (interval !== settings.app.check_interval_secs) app.check_interval_secs = interval;
 
       if (welcomeMessageTrimmed !== settings.app.welcome_message) {
         app.welcome_message = welcomeMessageTrimmed;
@@ -227,11 +223,7 @@
           <Card.Title>运行期配置</Card.Title>
         </div>
         <div class="flex items-center gap-2">
-          <Button
-            variant="outline"
-            disabled={loading || saving}
-            onclick={reload}
-          >
+          <Button variant="outline" disabled={loading || saving} onclick={reload}>
             {loading ? "加载中..." : "刷新"}
           </Button>
           <Button disabled={loading || saving} onclick={save}>
@@ -243,32 +235,41 @@
     <Card.Content>
       {#if settings}
         <div class="grid gap-4 sm:grid-cols-2">
-          <Field.Field data-invalid={invalidSettings("check_interval_secs", "app.check_interval_secs") || undefined}>
-            <Field.Label for="check_interval_secs"
-              >app.check_interval_secs</Field.Label
-            >
+          <Field.Field
+            data-invalid={invalidSettings("check_interval_secs", "app.check_interval_secs") ||
+              undefined}
+          >
+            <Field.Label for="check_interval_secs">app.check_interval_secs</Field.Label>
             <Input
               id="check_interval_secs"
               type="number"
               bind:value={checkIntervalSecs}
               aria-invalid={invalidSettings("check_interval_secs", "app.check_interval_secs")}
             />
-            <Field.Error errors={settingsErrorItems("check_interval_secs", "app.check_interval_secs")} />
+            <Field.Error
+              errors={settingsErrorItems("check_interval_secs", "app.check_interval_secs")}
+            />
           </Field.Field>
 
-          <Field.Field data-invalid={invalidSettings("example_api_base", "integrations.example_api_base") || undefined}>
-            <Field.Label for="example_api_base"
-              >integrations.example_api_base</Field.Label
-            >
+          <Field.Field
+            data-invalid={invalidSettings("example_api_base", "integrations.example_api_base") ||
+              undefined}
+          >
+            <Field.Label for="example_api_base">integrations.example_api_base</Field.Label>
             <Input
               id="example_api_base"
               bind:value={exampleApiBase}
               aria-invalid={invalidSettings("example_api_base", "integrations.example_api_base")}
             />
-            <Field.Error errors={settingsErrorItems("example_api_base", "integrations.example_api_base")} />
+            <Field.Error
+              errors={settingsErrorItems("example_api_base", "integrations.example_api_base")}
+            />
           </Field.Field>
 
-          <Field.Field class="sm:col-span-2" data-invalid={invalidSettings("welcome_message", "app.welcome_message") || undefined}>
+          <Field.Field
+            class="sm:col-span-2"
+            data-invalid={invalidSettings("welcome_message", "app.welcome_message") || undefined}
+          >
             <Field.Label for="welcome_message">app.welcome_message</Field.Label>
             <Input
               id="welcome_message"
@@ -278,20 +279,22 @@
             <Field.Error errors={settingsErrorItems("welcome_message", "app.welcome_message")} />
           </Field.Field>
 
-          <Field.Field class="sm:col-span-2" data-invalid={invalidSettings("example_api_key", "integrations.example_api_key") || undefined}>
-            <Field.Label for="example_api_key"
-              >integrations.example_api_key</Field.Label
-            >
+          <Field.Field
+            class="sm:col-span-2"
+            data-invalid={invalidSettings("example_api_key", "integrations.example_api_key") ||
+              undefined}
+          >
+            <Field.Label for="example_api_key">integrations.example_api_key</Field.Label>
             <Field.Description>留空不修改</Field.Description>
             <PasswordInput
               id="example_api_key"
               bind:value={exampleApiKey}
-              placeholder={settings.integrations.example_api_key_is_set
-                ? "已设置"
-                : "未设置"}
+              placeholder={settings.integrations.example_api_key_is_set ? "已设置" : "未设置"}
               aria-invalid={invalidSettings("example_api_key", "integrations.example_api_key")}
             />
-            <Field.Error errors={settingsErrorItems("example_api_key", "integrations.example_api_key")} />
+            <Field.Error
+              errors={settingsErrorItems("example_api_key", "integrations.example_api_key")}
+            />
           </Field.Field>
         </div>
       {:else}

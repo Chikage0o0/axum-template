@@ -62,8 +62,8 @@ in
   };
 
   scripts.db-migrate.exec = "sqlx migrate run";
-  scripts.backend-dev.exec = "PROJECT_NAME_AUTO_MIGRATE=0 cargo watch --skip-local-deps -c -d 0.5 -w src -w Cargo.toml -w Cargo.lock -L info -B 1 -x run";
-  scripts.backend-dev-migrate.exec = "PROJECT_NAME_AUTO_MIGRATE=1 cargo watch --skip-local-deps -c -d 0.5 -w src -w migrations -w Cargo.toml -w Cargo.lock -L info -B 1 -x run";
+  scripts.backend-dev.exec = "bacon --headless backend-dev";
+  scripts.backend-dev-migrate.exec = "bacon --headless backend-dev-migrate";
   scripts.check.exec = "bacon";
   scripts.dev-fmt.exec = ''
     set -euo pipefail

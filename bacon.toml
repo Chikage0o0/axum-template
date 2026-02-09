@@ -1,0 +1,13 @@
+[jobs.backend-dev]
+command = ["cargo", "run"]
+env.PROJECT_NAME_AUTO_MIGRATE = "0"
+default_watch = false
+watch = ["src", "Cargo.toml", "Cargo.lock"]
+need_stdout = true
+
+[jobs.backend-dev-migrate]
+command = ["cargo", "run"]
+env.PROJECT_NAME_AUTO_MIGRATE = "1"
+default_watch = false
+watch = ["src", "migrations", "Cargo.toml", "Cargo.lock"]
+need_stdout = true

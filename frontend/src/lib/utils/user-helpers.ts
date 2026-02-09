@@ -16,10 +16,7 @@ export type EditableUserDraft = {
   avatar_url: string;
 };
 
-export type CurrentUserEditable = Pick<
-  User,
-  "display_name" | "email" | "phone" | "avatar_url"
->;
+export type CurrentUserEditable = Pick<User, "display_name" | "email" | "phone" | "avatar_url">;
 
 export type CurrentUserDraft = {
   display_name: string;

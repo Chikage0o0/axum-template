@@ -238,15 +238,21 @@
   animation: sidebar-item-enter 380ms var(--ease-smooth) both;
 }
 
-[data-slot="sidebar-menu"] > [data-slot="sidebar-menu-item"]:nth-child(1) [data-slot="sidebar-menu-button"] {
+[data-slot="sidebar-menu"]
+  > [data-slot="sidebar-menu-item"]:nth-child(1)
+  [data-slot="sidebar-menu-button"] {
   animation-delay: 70ms;
 }
 
-[data-slot="sidebar-menu"] > [data-slot="sidebar-menu-item"]:nth-child(2) [data-slot="sidebar-menu-button"] {
+[data-slot="sidebar-menu"]
+  > [data-slot="sidebar-menu-item"]:nth-child(2)
+  [data-slot="sidebar-menu-button"] {
   animation-delay: 130ms;
 }
 
-[data-slot="sidebar-menu"] > [data-slot="sidebar-menu-item"]:nth-child(3) [data-slot="sidebar-menu-button"] {
+[data-slot="sidebar-menu"]
+  > [data-slot="sidebar-menu-item"]:nth-child(3)
+  [data-slot="sidebar-menu-button"] {
   animation-delay: 190ms;
 }
 

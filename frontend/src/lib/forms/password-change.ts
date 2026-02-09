@@ -1,10 +1,6 @@
 import { PatchCurrentUserPasswordRequest as PatchCurrentUserPasswordRequestSchema } from "$lib/api/generated/schemas";
 
-import {
-  mergeFieldErrors,
-  type FieldErrors,
-  zodErrorToFieldErrors,
-} from "./field-errors";
+import { mergeFieldErrors, type FieldErrors, zodErrorToFieldErrors } from "./field-errors";
 
 type PasswordChangeFormInput = {
   currentPassword: string;
@@ -17,9 +13,10 @@ type PasswordChangePayload = {
   new_password: string;
 };
 
-export function validatePasswordChangeForm(
-  input: PasswordChangeFormInput,
-): { payload: PasswordChangePayload | null; errors: FieldErrors } {
+export function validatePasswordChangeForm(input: PasswordChangeFormInput): {
+  payload: PasswordChangePayload | null;
+  errors: FieldErrors;
+} {
   const currentPassword = input.currentPassword.trim();
   const newPassword = input.newPassword.trim();
   const confirmPassword = input.confirmPassword.trim();

@@ -4,8 +4,5 @@
 import { z } from "zod";
 
 {{#each schemas}}
-  export const
-  {{@key}}
-  =
-  {{{this}}};
+export const {{@key}} = {{{this}}};
 {{/each}}

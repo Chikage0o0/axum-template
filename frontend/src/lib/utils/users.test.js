@@ -1,10 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import {
-  buildCurrentUserPatchPayload,
-  buildPatchUserPayload,
-  toAuthUser,
-} from "./user-helpers";
+import { buildCurrentUserPatchPayload, buildPatchUserPayload, toAuthUser } from "./user-helpers";
 
 describe("buildPatchUserPayload", () => {
   it("should reject when no field changed", () => {

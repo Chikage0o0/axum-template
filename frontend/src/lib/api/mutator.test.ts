@@ -30,8 +30,7 @@ function createMemoryStorage(): MemoryStorage {
 }
 
 const originalFetch = globalThis.fetch;
-const originalLocalStorage = (globalThis as { localStorage?: MemoryStorage })
-  .localStorage;
+const originalLocalStorage = (globalThis as { localStorage?: MemoryStorage }).localStorage;
 
 describe("apiClient", () => {
   beforeEach(() => {
@@ -72,7 +71,10 @@ describe("apiClient", () => {
     await expect(
       apiClient<void>("/api/v1/security/password", {
         method: "PATCH",
-        body: JSON.stringify({ current_password: "bad", new_password: "new-password-123" }),
+        body: JSON.stringify({
+          current_password: "bad",
+          new_password: "new-password-123",
+        }),
       }),
     ).rejects.toBeInstanceOf(ApiError);
 
