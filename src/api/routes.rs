@@ -1,7 +1,7 @@
 use arc_swap::ArcSwap;
 use axum::{
     middleware,
-    routing::{get, patch, post},
+    routing::{any, get, patch, post},
     Router,
 };
 use std::sync::Arc;
@@ -20,6 +20,7 @@ use crate::api::openapi::ApiDoc;
 use crate::config::runtime::RuntimeConfig;
 use crate::db::DbPool;
 use crate::error::AppError;
+use crate::web_assets::{serve_frontend_index, serve_frontend_path};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -39,7 +40,7 @@ impl AppState {
 
 pub fn app_router(state: AppState) -> Router {
     let public_routes = Router::new()
-        .route("/health", get(health_check))
+        .route("/api/v1/health", get(health_check))
         .route("/api/v1/sessions", post(create_session_handler));
 
     let protected_routes = Router::new()
@@ -70,11 +71,23 @@ pub fn app_router(state: AppState) -> Router {
             auth_middleware,
         ));
 
-    let mut router = Router::new().merge(public_routes).merge(protected_routes);
+    let mut router = Router::new()
+        .merge(public_routes)
+        .merge(protected_routes)
+        .route("/api", any(api_not_found))
+        .route("/api/", any(api_not_found))
+        .route("/api/{*path}", any(api_not_found));
+
+    if cfg!(embed_frontend) {
+        router = router
+            .route("/", get(serve_frontend_index))
+            .route("/{*path}", get(serve_frontend_path));
+    }
 
     if should_expose_openapi() {
-        router = router
-            .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()));
+        router = router.merge(
+            SwaggerUi::new("/api/v1/swagger-ui").url("/api/v1/openapi.json", ApiDoc::openapi()),
+        );
     }
 
     router.with_state(state)
@@ -82,6 +95,10 @@ pub fn app_router(state: AppState) -> Router {
 
 async fn health_check() -> &'static str {
     "OK"
+}
+
+async fn api_not_found() -> AppError {
+    AppError::NotFound("API 路径不存在".to_string())
 }
 
 fn should_expose_openapi() -> bool {

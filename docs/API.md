@@ -6,6 +6,18 @@
 - Content-Type：请求/响应以 JSON 为主
 - 错误体：`{ code, message, request_id, details? }`
 - 追踪：`x-request-id` 必须在响应头回传
+- 非 `/api` 路径由前端页面接管（SPA fallback，仅 release 构建）
+
+## 基础设施接口
+
+### 健康检查
+
+`GET /api/v1/health`
+
+### OpenAPI / Swagger（可选暴露）
+
+- `GET /api/v1/openapi.json`
+- `GET /api/v1/swagger-ui`
 
 ### 认证相关错误码
 

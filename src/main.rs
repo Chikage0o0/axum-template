@@ -4,6 +4,7 @@ pub mod db;
 pub mod error;
 pub mod password;
 pub mod services;
+pub mod web_assets;
 
 use crate::api::request_id::request_id_middleware;
 use crate::api::routes::{app_router, AppState};
@@ -68,6 +69,11 @@ async fn main() -> anyhow::Result<()> {
 
     let access_log = TraceLayer::new_for_http()
         .make_span_with(|request: &axum::http::Request<_>| {
+            let path = request.uri().path();
+            if should_skip_access_log(path) {
+                return tracing::Span::none();
+            }
+
             let user_agent = request
                 .headers()
                 .get(axum::http::header::USER_AGENT)
@@ -101,7 +107,7 @@ async fn main() -> anyhow::Result<()> {
             tracing::info_span!(
                 "access",
                 method = %request.method(),
-                path = %request.uri().path(),
+                path = %path,
                 client_ip = %client_ip,
                 user_agent = %user_agent,
                 request_id = %request_id,
@@ -109,6 +115,9 @@ async fn main() -> anyhow::Result<()> {
         })
         .on_response(
             |response: &axum::http::Response<_>, latency: Duration, span: &Span| {
+                if span.is_disabled() {
+                    return;
+                }
                 let status = response.status().as_u16();
                 let latency_ms = latency.as_millis() as u64;
                 if status >= 500 {
@@ -119,6 +128,9 @@ async fn main() -> anyhow::Result<()> {
         )
         .on_failure(
             |failure: ServerErrorsFailureClass, latency: Duration, span: &Span| {
+                if span.is_disabled() {
+                    return;
+                }
                 let latency_ms = latency.as_millis() as u64;
                 match failure {
                     ServerErrorsFailureClass::StatusCode(code) => {
@@ -169,6 +181,10 @@ fn auto_migrate_enabled() -> bool {
     };
     let v = v.trim();
     !(v == "0" || v.eq_ignore_ascii_case("false"))
+}
+
+fn should_skip_access_log(path: &str) -> bool {
+    !path.starts_with("/api")
 }
 
 async fn run_migrations(db: &crate::db::DbPool) -> anyhow::Result<()> {

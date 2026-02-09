@@ -17,7 +17,15 @@ bun install
 bun run dev
 ```
 
-## 3. OpenAPI（规范中心）
+## 3. 单体运行（release）
+
+```bash
+cargo run --release
+```
+
+说明：仅 release profile 会在编译期执行前端 clean build 并嵌入二进制；debug profile 不做前端构建与嵌入。
+
+## 4. OpenAPI（规范中心）
 
 后端导出：
 
@@ -41,7 +49,7 @@ cd frontend
 bun run check:api-usage
 ```
 
-## 4. 提交前检查
+## 5. 提交前检查
 
 ```bash
 cargo fmt -- --check

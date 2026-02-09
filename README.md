@@ -23,27 +23,29 @@ devenv shell
 devenv up
 ```
 
-3) 启动后端
-
-```bash
-cargo run
-```
-
-4) 启动前端
+3) 安装前端依赖（仅首次 / 依赖变更后）
 
 ```bash
 cd frontend
 bun install
-bun run dev
 ```
+
+4) 单体运行（release 构建时内嵌前端）
+
+```bash
+cargo run --release
+```
+
+开发模式不做前端构建与嵌入；本地联调请使用 `cargo run` + `cd frontend && bun run dev`。
 
 ## 验证规范是否生效
 
-- `GET /health`：健康检查
+- `GET /api/v1/health`：健康检查
 - `x-request-id`：无论成功/失败都回传响应头 `x-request-id`，错误体也包含 `request_id`
 - 统一错误体：失败时返回 JSON：`{ code, message, request_id, details? }`
 - 配置热更新：`PATCH /api/v1/settings` 写入 `system_config` 后立即在内存生效
 - 安全：修改管理员密码会轮换 JWT secret，使旧 token 立即失效
+- 路由接管（release）：访问任意非 `/api` 路径（如 `/login`、`/settings`）都返回前端页面
 
 ## PROJECT_NAME 替换指引
 

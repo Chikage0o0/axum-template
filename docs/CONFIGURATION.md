@@ -18,6 +18,13 @@
 - `PROJECT_NAME_AUTO_MIGRATE`：是否启动时自动迁移（默认 true）
 - `PROJECT_NAME_EXPOSE_OPENAPI`：是否暴露 OpenAPI/Swagger UI（默认 debug 开、release 关）
 
+## 前端静态资源嵌入
+
+- 仅在 **release profile**（如 `cargo build --release` / `cargo run --release`）触发前端构建与嵌入。
+- release 构建时，`build.rs` 会先清理 `frontend/build`，再执行 `bun run build`，确保是 clean build。
+- release 二进制内嵌前端产物，非 `/api` 路径返回前端页面；API 仅在 `/api/*` 下提供。
+- debug/test profile 不做前端构建与嵌入。
+
 ## 运行期配置（DB: system_config）
 
 表结构：`system_config(key, value jsonb, description, updated_at)`
