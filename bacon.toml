@@ -2,12 +2,18 @@
 command = ["cargo", "run"]
 env.PROJECT_NAME_AUTO_MIGRATE = "0"
 default_watch = false
-watch = ["src", "Cargo.toml", "Cargo.lock"]
+watch = ["src", "build.rs", "Cargo.toml", "Cargo.lock", ".env"]
 need_stdout = true
+background = false
+on_change_strategy = "kill_then_restart"
+kill = ["kill", "-s", "INT"]
 
 [jobs.backend-dev-migrate]
 command = ["cargo", "run"]
 env.PROJECT_NAME_AUTO_MIGRATE = "1"
 default_watch = false
-watch = ["src", "migrations", "Cargo.toml", "Cargo.lock"]
+watch = ["src", "migrations", "build.rs", "Cargo.toml", "Cargo.lock", ".env"]
 need_stdout = true
+background = false
+on_change_strategy = "kill_then_restart"
+kill = ["kill", "-s", "INT"]
