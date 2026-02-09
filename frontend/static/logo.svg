@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <!-- Rust 橙色渐变 -->
+    <linearGradient id="rustGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F74C00"/>
+      <stop offset="100%" style="stop-color:#B7410E"/>
+    </linearGradient>
+    <!-- Svelte 橙红渐变 -->
+    <linearGradient id="svelteGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF3E00"/>
+      <stop offset="50%" style="stop-color:#F73C00"/>
+      <stop offset="100%" style="stop-color:#E63500"/>
+    </linearGradient>
+    <!-- Shadcn 暗色渐变 -->
+    <linearGradient id="shadcnGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#0F0F0F"/>
+      <stop offset="100%" style="stop-color:#1A1A1A"/>
+    </linearGradient>
+    <!-- 高光渐变 -->
+    <linearGradient id="highlightGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:0.15"/>
+      <stop offset="100%" style="stop-color:#FFFFFF;stop-opacity:0"/>
+    </linearGradient>
+    <!-- 阴影滤镜 -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- 背景圆形 - Shadcn 暗色基底 -->
+  <circle cx="256" cy="256" r="240" fill="url(#shadcnGradient)" filter="url(#shadow)"/>
+  
+  <!-- 外环齿轮 - Rust 特征 (8个齿) -->
+  <g transform="translate(256, 256)">
+    <!-- 齿轮齿 -->
+    <g fill="url(#rustGradient)">
+      <rect x="-20" y="-230" width="40" height="50" rx="6"/>
+      <rect x="-20" y="-230" width="40" height="50" rx="6" transform="rotate(45)"/>
+      <rect x="-20" y="-230" width="40" height="50" rx="6" transform="rotate(90)"/>
+      <rect x="-20" y="-230" width="40" height="50" rx="6" transform="rotate(135)"/>
+      <rect x="-20" y="-230" width="40" height="50" rx="6" transform="rotate(180)"/>
+      <rect x="-20" y="-230" width="40" height="50" rx="6" transform="rotate(225)"/>
+      <rect x="-20" y="-230" width="40" height="50" rx="6" transform="rotate(270)"/>
+      <rect x="-20" y="-230" width="40" height="50" rx="6" transform="rotate(315)"/>
+    </g>
+    <!-- 齿轮主环 -->
+    <circle cx="0" cy="0" r="190" fill="none" stroke="url(#rustGradient)" stroke-width="28"/>
+  </g>
+  
+  <!-- 内部六边形 - Axum 现代几何 -->
+  <polygon 
+    points="256,116 376,186 376,326 256,396 136,326 136,186" 
+    fill="none" 
+    stroke="#FAFAFA" 
+    stroke-width="8"
+    stroke-linejoin="round"
+    opacity="0.9"
+  />
+  
+  <!-- Svelte 风格的流动 S 曲线 -->
+  <g transform="translate(256, 256)">
+    <!-- 主 S 曲线 -->
+    <path 
+      d="M-45,-90 
+         C-45,-90 45,-90 45,-45 
+         C45,0 -45,0 -45,45 
+         C-45,90 45,90 45,90"
+      fill="none"
+      stroke="url(#svelteGradient)"
+      stroke-width="24"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <!-- S 曲线高光 -->
+    <path 
+      d="M-45,-90 
+         C-45,-90 45,-90 45,-45 
+         C45,0 -45,0 -45,45 
+         C-45,90 45,90 45,90"
+      fill="none"
+      stroke="url(#highlightGradient)"
+      stroke-width="24"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+  
+  <!-- 中心圆点 - 统一核心 -->
+  <circle cx="256" cy="256" r="12" fill="#FAFAFA"/>
+  
+  <!-- 顶部高光弧 -->
+  <path 
+    d="M120,180 Q256,80 392,180" 
+    fill="none" 
+    stroke="url(#highlightGradient)" 
+    stroke-width="40"
+    stroke-linecap="round"
+  />
+</svg>
