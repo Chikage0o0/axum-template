@@ -1,6 +1,8 @@
 <script lang="ts">
   import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
+  import KeyRoundIcon from "@lucide/svelte/icons/key-round";
   import LogOutIcon from "@lucide/svelte/icons/log-out";
+  import UserPenIcon from "@lucide/svelte/icons/user-pen";
   import { AvatarBeam } from "svelte-boring-avatars";
   import { toast } from "svelte-sonner";
   import { ApiError } from "$lib/api/mutator";
@@ -300,8 +302,14 @@
 
         <DropdownMenu.Separator />
 
-        <DropdownMenu.Item onclick={openProfileDialog}>编辑信息</DropdownMenu.Item>
-        <DropdownMenu.Item onclick={openPasswordDialog}>修改密码</DropdownMenu.Item>
+        <DropdownMenu.Item onclick={openProfileDialog}>
+          <UserPenIcon />
+          编辑信息
+        </DropdownMenu.Item>
+        <DropdownMenu.Item onclick={openPasswordDialog}>
+          <KeyRoundIcon />
+          修改密码
+        </DropdownMenu.Item>
 
         <DropdownMenu.Separator />
         <DropdownMenu.Item variant="destructive" onclick={onLogout}>
