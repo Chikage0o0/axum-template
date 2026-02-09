@@ -37,12 +37,14 @@ impl Modify for SecurityAddon {
     tags(
         (name = "sessions", description = "认证与会话"),
         (name = "settings", description = "运行期配置"),
-        (name = "security", description = "安全与密钥轮换"),
+        (name = "security", description = "安全与凭证管理"),
         (name = "users", description = "用户与多 provider 账号连接管理")
     ),
     modifiers(&SecurityAddon),
     paths(
         sessions::create_session_handler,
+        sessions::refresh_session_handler,
+        sessions::delete_current_session_handler,
         settings::get_settings_handler,
         settings::patch_settings_handler,
         security_handlers::patch_current_user_password_handler,
@@ -126,6 +128,14 @@ mod tests {
             .paths
             .paths
             .contains_key("/api/v1/security/admin-password"));
+    }
+
+    #[test]
+    fn should_expose_session_refresh_and_current_paths() {
+        let doc = ApiDoc::openapi();
+
+        assert!(doc.paths.paths.contains_key("/api/v1/sessions/refresh"));
+        assert!(doc.paths.paths.contains_key("/api/v1/sessions/current"));
     }
 
     #[test]

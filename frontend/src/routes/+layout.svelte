@@ -13,7 +13,11 @@
   import { Separator } from "$lib/shadcn/components/ui/separator/index.js";
   import { Toaster } from "$lib/shadcn/components/ui/sonner/index.js";
   import * as Sidebar from "$lib/shadcn/components/ui/sidebar/index.js";
-  import { getCurrentUserHandler } from "$lib/api/generated/client";
+  import {
+    deleteCurrentSessionHandler,
+    getCurrentUserHandler,
+    refreshSessionHandler,
+  } from "$lib/api/generated/client";
   import { setupZodErrorMap } from "$lib/forms/zod-error-map";
   import { auth } from "$lib/stores/auth";
   import { composeDocumentTitleFromPageData } from "$lib/utils/page-title";
@@ -28,6 +32,7 @@
   let pathname = $derived(page.url.pathname);
   let documentTitle = $derived(composeDocumentTitleFromPageData(page.data));
   let syncedToken = $state<string | null>(null);
+  let ensuringSession = false;
   type ThemeMode = "light" | "dark" | "system";
   let preferredMode = $derived(userPrefersMode.current as ThemeMode);
   let appliedMode = $derived(mode.current ?? "light");
@@ -49,9 +54,28 @@
 
   $effect(() => {
     if (isLoginRoute) return;
-    if (!$auth.isAuthenticated) {
-      void goto("/login");
-    }
+    if ($auth.isAuthenticated || ensuringSession) return;
+
+    let cancelled = false;
+    ensuringSession = true;
+
+    void (async () => {
+      try {
+        const refreshed = await refreshSessionHandler();
+        if (cancelled) return;
+        auth.login(refreshed.token);
+      } catch {
+        if (cancelled) return;
+        auth.logout({ reason: "manual" });
+        await goto("/login");
+      } finally {
+        ensuringSession = false;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   });
 
   $effect(() => {
@@ -61,11 +85,12 @@
     }
 
     const token = $auth.token;
+    const currentUser = $auth.user;
     if (!token) {
       syncedToken = null;
       return;
     }
-    if (token === syncedToken) return;
+    if (token === syncedToken && currentUser) return;
 
     let cancelled = false;
     void (async () => {
@@ -95,6 +120,11 @@
   });
 
   async function handleLogout() {
+    try {
+      await deleteCurrentSessionHandler();
+    } catch {
+      // 忽略服务端退出失败，始终清理本地状态。
+    }
     auth.logout({ reason: "manual" });
     await goto("/login");
   }

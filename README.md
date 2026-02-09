@@ -44,7 +44,7 @@ cargo run --release
 - `x-request-id`：无论成功/失败都回传响应头 `x-request-id`，错误体也包含 `request_id`
 - 统一错误体：失败时返回 JSON：`{ code, message, request_id, details? }`
 - 配置热更新：`PATCH /api/v1/settings` 写入 `system_config` 后立即在内存生效
-- 安全：修改当前登录用户密码会轮换 JWT secret，使旧 token 立即失效
+- 安全：修改当前登录用户密码只会使该用户全部会话失效（其他用户不受影响）
 - 路由接管（release）：访问任意非 `/api` 路径（如 `/login`、`/settings`）都返回前端页面
 
 ## PROJECT_NAME 替换指引

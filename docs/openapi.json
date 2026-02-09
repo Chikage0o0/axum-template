@@ -137,6 +137,84 @@
         }
       }
     },
+    "/api/v1/sessions/current": {
+      "delete": {
+        "tags": [
+          "sessions"
+        ],
+        "operationId": "delete_current_session_handler",
+        "responses": {
+          "204": {
+            "description": "当前会话已退出（无 body）"
+          },
+          "401": {
+            "description": "未登录或 Token 无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务器内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/sessions/refresh": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "operationId": "refresh_session_handler",
+        "responses": {
+          "200": {
+            "description": "刷新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateSessionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "refresh token 无效或已过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务器内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/settings": {
       "get": {
         "tags": [
@@ -1169,7 +1247,7 @@
     },
     {
       "name": "security",
-      "description": "安全与密钥轮换"
+      "description": "安全与凭证管理"
     },
     {
       "name": "users",

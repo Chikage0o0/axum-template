@@ -23,6 +23,7 @@
 - `id` (uuid, PK)
 - `username` (varchar, unique, nullable)
 - `password_hash` (text, nullable, Argon2id PHC)
+- `auth_version` (int, non-null, default `0`)
 - `display_name` (varchar, non-null)
 - `email` (varchar, unique, non-null)
 - `phone` / `avatar_url` (nullable)
@@ -34,7 +35,25 @@
 
 - 存储用户基本信息（本地用户主表）
 - `password_hash` 用于本地用户名/密码登录；为空表示仅支持外部身份登录
+- `auth_version` 用于用户级凭证版本控制（改密后递增，旧 access token 立即失效）
 - 与 `user_identities` 形成 1:N 关系，支持一个用户绑定多个外部身份
+
+## 表：auth_sessions
+
+字段（核心）：
+
+- `id` (uuid, PK，会话 ID)
+- `user_id` (uuid, FK -> users.id, on delete cascade)
+- `refresh_secret_hash` (text, Argon2id PHC)
+- `expires_at` (timestamptz)
+- `revoked_at` / `revoked_reason` (nullable)
+- `created_at` / `updated_at` (timestamptz)
+
+用途：
+
+- 存储 refresh token 对应的服务端会话状态
+- 支持 refresh token 轮换（rotation）与会话撤销
+- 支持“仅当前用户全部设备下线”，不影响其他用户
 
 ## 表：user_identities
 

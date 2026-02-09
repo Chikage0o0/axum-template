@@ -13,6 +13,8 @@ export function composeDocumentTitle(tabName: string | null | undefined): string
   return `${normalized} | ${APP_DISPLAY_NAME}`;
 }
 
-export function composeDocumentTitleFromPageData(pageData: PageDataWithTitle | null | undefined): string {
+export function composeDocumentTitleFromPageData(
+  pageData: PageDataWithTitle | null | undefined,
+): string {
   return composeDocumentTitle(pageData?.pageTitle);
 }

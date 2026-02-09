@@ -40,6 +40,6 @@
 
 说明：
 
-- `security.jwt_secret` 为 JWT HS256 签名密钥；修改当前登录用户密码时会轮换该值。
+- `security.jwt_secret` 为 JWT HS256 签名密钥；仅在密钥泄露等应急场景需要轮换。
 - `security.admin_password_hash` 已废弃，仅作为迁移来源保留；当前登录密码存储在 `users.password_hash`。
 - 运行期配置读取时会做类型检查，类型错误会导致启动失败。

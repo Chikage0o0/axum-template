@@ -5,7 +5,7 @@
  * PROJECT_NAME 对外 REST API（以 OpenAPI 作为规范中心）。
  * OpenAPI spec version: 0.1.0
  */
-import { apiClient } from "../mutator";
+import { apiClient } from '../mutator';
 export interface AppSettings {
   /** @minimum 0 */
   check_interval_secs: number;
@@ -251,147 +251,261 @@ export interface UserResponse {
 }
 
 export const getPatchCurrentUserPasswordHandlerUrl = () => {
-  return `/api/v1/security/password`;
-};
 
-export const patchCurrentUserPasswordHandler = async (
-  patchCurrentUserPasswordRequest: PatchCurrentUserPasswordRequest,
-  options?: RequestInit,
-): Promise<void> => {
-  return apiClient<void>(getPatchCurrentUserPasswordHandlerUrl(), {
+
+  
+
+  return `/api/v1/security/password`
+}
+
+export const patchCurrentUserPasswordHandler = async (patchCurrentUserPasswordRequest: PatchCurrentUserPasswordRequest, options?: RequestInit): Promise<void> => {
+  
+  return apiClient<void>(getPatchCurrentUserPasswordHandlerUrl(),
+  {      
     ...options,
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(patchCurrentUserPasswordRequest),
-  });
-};
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      patchCurrentUserPasswordRequest,)
+  }
+);}
+
+
 
 export const getCreateSessionHandlerUrl = () => {
-  return `/api/v1/sessions`;
-};
 
-export const createSessionHandler = async (
-  createSessionRequest: CreateSessionRequest,
-  options?: RequestInit,
-): Promise<CreateSessionResponse> => {
-  return apiClient<CreateSessionResponse>(getCreateSessionHandlerUrl(), {
+
+  
+
+  return `/api/v1/sessions`
+}
+
+export const createSessionHandler = async (createSessionRequest: CreateSessionRequest, options?: RequestInit): Promise<CreateSessionResponse> => {
+  
+  return apiClient<CreateSessionResponse>(getCreateSessionHandlerUrl(),
+  {      
     ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(createSessionRequest),
-  });
-};
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createSessionRequest,)
+  }
+);}
+
+
+
+export const getDeleteCurrentSessionHandlerUrl = () => {
+
+
+  
+
+  return `/api/v1/sessions/current`
+}
+
+export const deleteCurrentSessionHandler = async ( options?: RequestInit): Promise<void> => {
+  
+  return apiClient<void>(getDeleteCurrentSessionHandlerUrl(),
+  {      
+    ...options,
+    method: 'DELETE'
+    
+    
+  }
+);}
+
+
+
+export const getRefreshSessionHandlerUrl = () => {
+
+
+  
+
+  return `/api/v1/sessions/refresh`
+}
+
+export const refreshSessionHandler = async ( options?: RequestInit): Promise<CreateSessionResponse> => {
+  
+  return apiClient<CreateSessionResponse>(getRefreshSessionHandlerUrl(),
+  {      
+    ...options,
+    method: 'POST'
+    
+    
+  }
+);}
+
+
 
 export const getGetSettingsHandlerUrl = () => {
-  return `/api/v1/settings`;
-};
 
-export const getSettingsHandler = async (options?: RequestInit): Promise<SettingsResponse> => {
-  return apiClient<SettingsResponse>(getGetSettingsHandlerUrl(), {
+
+  
+
+  return `/api/v1/settings`
+}
+
+export const getSettingsHandler = async ( options?: RequestInit): Promise<SettingsResponse> => {
+  
+  return apiClient<SettingsResponse>(getGetSettingsHandlerUrl(),
+  {      
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+    
+    
+  }
+);}
+
+
 
 export const getPatchSettingsHandlerUrl = () => {
-  return `/api/v1/settings`;
-};
 
-export const patchSettingsHandler = async (
-  patchSettingsRequest: PatchSettingsRequest,
-  options?: RequestInit,
-): Promise<SettingsResponse> => {
-  return apiClient<SettingsResponse>(getPatchSettingsHandlerUrl(), {
+
+  
+
+  return `/api/v1/settings`
+}
+
+export const patchSettingsHandler = async (patchSettingsRequest: PatchSettingsRequest, options?: RequestInit): Promise<SettingsResponse> => {
+  
+  return apiClient<SettingsResponse>(getPatchSettingsHandlerUrl(),
+  {      
     ...options,
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(patchSettingsRequest),
-  });
-};
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      patchSettingsRequest,)
+  }
+);}
+
+
 
 export const getGetUsersHandlerUrl = () => {
-  return `/api/v1/users`;
-};
 
-export const getUsersHandler = async (options?: RequestInit): Promise<UserResponse[]> => {
-  return apiClient<UserResponse[]>(getGetUsersHandlerUrl(), {
+
+  
+
+  return `/api/v1/users`
+}
+
+export const getUsersHandler = async ( options?: RequestInit): Promise<UserResponse[]> => {
+  
+  return apiClient<UserResponse[]>(getGetUsersHandlerUrl(),
+  {      
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+    
+    
+  }
+);}
+
+
 
 export const getCreateUserHandlerUrl = () => {
-  return `/api/v1/users`;
-};
 
-export const createUserHandler = async (
-  createUserRequest: CreateUserRequest,
-  options?: RequestInit,
-): Promise<UserResponse> => {
-  return apiClient<UserResponse>(getCreateUserHandlerUrl(), {
+
+  
+
+  return `/api/v1/users`
+}
+
+export const createUserHandler = async (createUserRequest: CreateUserRequest, options?: RequestInit): Promise<UserResponse> => {
+  
+  return apiClient<UserResponse>(getCreateUserHandlerUrl(),
+  {      
     ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(createUserRequest),
-  });
-};
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createUserRequest,)
+  }
+);}
+
+
 
 export const getGetCurrentUserHandlerUrl = () => {
-  return `/api/v1/users/me`;
-};
 
-export const getCurrentUserHandler = async (options?: RequestInit): Promise<UserResponse> => {
-  return apiClient<UserResponse>(getGetCurrentUserHandlerUrl(), {
+
+  
+
+  return `/api/v1/users/me`
+}
+
+export const getCurrentUserHandler = async ( options?: RequestInit): Promise<UserResponse> => {
+  
+  return apiClient<UserResponse>(getGetCurrentUserHandlerUrl(),
+  {      
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+    
+    
+  }
+);}
 
-export const getPatchUserHandlerUrl = (userId: string) => {
-  return `/api/v1/users/${userId}`;
-};
 
-export const patchUserHandler = async (
-  userId: string,
-  patchUserRequest: PatchUserRequest,
-  options?: RequestInit,
-): Promise<UserResponse> => {
-  return apiClient<UserResponse>(getPatchUserHandlerUrl(userId), {
+
+export const getPatchUserHandlerUrl = (userId: string,) => {
+
+
+  
+
+  return `/api/v1/users/${userId}`
+}
+
+export const patchUserHandler = async (userId: string,
+    patchUserRequest: PatchUserRequest, options?: RequestInit): Promise<UserResponse> => {
+  
+  return apiClient<UserResponse>(getPatchUserHandlerUrl(userId),
+  {      
     ...options,
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(patchUserRequest),
-  });
-};
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      patchUserRequest,)
+  }
+);}
 
-export const getCreateUserIdentityHandlerUrl = (userId: string) => {
-  return `/api/v1/users/${userId}/identities`;
-};
 
-export const createUserIdentityHandler = async (
-  userId: string,
-  createUserIdentityRequest: CreateUserIdentityRequest,
-  options?: RequestInit,
-): Promise<UserIdentityResponse> => {
-  return apiClient<UserIdentityResponse>(getCreateUserIdentityHandlerUrl(userId), {
+
+export const getCreateUserIdentityHandlerUrl = (userId: string,) => {
+
+
+  
+
+  return `/api/v1/users/${userId}/identities`
+}
+
+export const createUserIdentityHandler = async (userId: string,
+    createUserIdentityRequest: CreateUserIdentityRequest, options?: RequestInit): Promise<UserIdentityResponse> => {
+  
+  return apiClient<UserIdentityResponse>(getCreateUserIdentityHandlerUrl(userId),
+  {      
     ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(createUserIdentityRequest),
-  });
-};
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createUserIdentityRequest,)
+  }
+);}
 
-export const getDeleteUserIdentityHandlerUrl = (userId: string, identityId: string) => {
-  return `/api/v1/users/${userId}/identities/${identityId}`;
-};
 
-export const deleteUserIdentityHandler = async (
-  userId: string,
-  identityId: string,
-  options?: RequestInit,
-): Promise<void> => {
-  return apiClient<void>(getDeleteUserIdentityHandlerUrl(userId, identityId), {
+
+export const getDeleteUserIdentityHandlerUrl = (userId: string,
+    identityId: string,) => {
+
+
+  
+
+  return `/api/v1/users/${userId}/identities/${identityId}`
+}
+
+export const deleteUserIdentityHandler = async (userId: string,
+    identityId: string, options?: RequestInit): Promise<void> => {
+  
+  return apiClient<void>(getDeleteUserIdentityHandlerUrl(userId,identityId),
+  {      
     ...options,
-    method: "DELETE",
-  });
-};
+    method: 'DELETE'
+    
+    
+  }
+);}

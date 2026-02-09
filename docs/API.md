@@ -45,10 +45,28 @@
 响应示例：
 
 ```json
-{ "token": "...", "expires_in": 86400 }
+{ "token": "...", "expires_in": 900 }
 ```
 
-说明：`expires_in` 固定为 24 小时（秒）。
+说明：
+
+- `expires_in` 固定为 15 分钟（`900` 秒）
+- 响应会通过 `Set-Cookie` 写入 HttpOnly `refresh_token`（有效期 30 天）
+
+### 刷新会话
+
+`POST /api/v1/sessions/refresh`
+
+说明：
+
+- 通过 HttpOnly `refresh_token` 轮换并签发新的 access token
+- 响应体同登录：`{ "token": "...", "expires_in": 900 }`
+
+### 退出当前会话
+
+`DELETE /api/v1/sessions/current`（需要 Bearer Token）
+
+响应：`204 No Content`。
 
 ## 运行期配置
 
@@ -92,7 +110,7 @@
 
 响应：`204 No Content`。
 
-说明：修改成功后会轮换 `security.jwt_secret`，旧 token 立即失效。
+说明：修改成功后会撤销当前用户全部会话（所有设备需重新登录），但不会影响其他用户。
 
 ## 用户管理
 

@@ -2,10 +2,7 @@ use axum::extract::{Extension, State};
 use axum::http::StatusCode;
 use garde::Validate;
 use serde::Deserialize;
-use std::sync::Arc;
 use utoipa::ToSchema;
-
-use argon2::password_hash::rand_core::{OsRng, RngCore};
 
 use crate::api::auth::CurrentUser;
 use crate::api::routes::AppState;
@@ -44,8 +41,6 @@ pub async fn patch_current_user_password_handler(
         PatchCurrentUserPasswordRequest,
     >,
 ) -> Result<StatusCode, AppError> {
-    let cfg = state.config.load_full();
-
     let current_hash = load_current_user_password_hash(&state, current_user.user_id).await?;
 
     let ok = crate::password::verify_password(&payload.current_password, &current_hash)
@@ -58,8 +53,6 @@ pub async fn patch_current_user_password_handler(
     let hash = crate::password::hash_password_argon2id(new_password)
         .map_err(|e| AppError::validation(format!("新密码不合法: {e}")))?;
 
-    let new_jwt_secret = generate_jwt_secret_hex()?;
-
     let mut tx = state
         .db
         .begin()
@@ -70,6 +63,7 @@ pub async fn patch_current_user_password_handler(
         r#"
 UPDATE users
 SET password_hash = $2,
+    auth_version = auth_version + 1,
     updated_at = NOW()
 WHERE id = $1
         "#,
@@ -88,26 +82,22 @@ WHERE id = $1
 
     sqlx::query(
         r#"
-INSERT INTO system_config (key, value)
-VALUES ('security.jwt_secret', $1)
-ON CONFLICT (key) DO UPDATE
-SET value = EXCLUDED.value,
+UPDATE auth_sessions
+SET revoked_at = NOW(),
+    revoked_reason = 'password_changed',
     updated_at = NOW()
+WHERE user_id = $1
+  AND revoked_at IS NULL
         "#,
     )
-    .bind(serde_json::Value::String(new_jwt_secret.clone()))
+    .bind(current_user.user_id)
     .execute(&mut *tx)
     .await
-    .map_err(|e| AppError::InternalError(format!("写入 security.jwt_secret 失败: {e}")))?;
+    .map_err(|e| AppError::InternalError(format!("撤销用户会话失败: {e}")))?;
 
     tx.commit()
         .await
         .map_err(|e| AppError::InternalError(format!("提交改密事务失败: {e}")))?;
-
-    // 只更新内存中的 jwt_secret，确保密钥轮换立即生效。
-    let mut next_cfg = cfg.as_ref().clone();
-    next_cfg.security.jwt_secret = new_jwt_secret;
-    state.config.store(Arc::new(next_cfg));
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -133,10 +123,4 @@ LIMIT 1
     .ok_or_else(|| AppError::NotFound(format!("当前用户不存在或未设置密码: {user_id}")))?;
 
     Ok(hash)
-}
-
-fn generate_jwt_secret_hex() -> Result<String, AppError> {
-    let mut bytes = [0u8; 32];
-    OsRng.fill_bytes(&mut bytes);
-    Ok(crate::config::seed::hex_encode(&bytes))
 }

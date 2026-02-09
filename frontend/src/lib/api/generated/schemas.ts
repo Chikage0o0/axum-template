@@ -18,19 +18,13 @@ export const ErrorResponseBody = z
   })
   .passthrough();
 export const CreateSessionRequest = z
-  .object({
-    password: z.string().min(1).max(256),
-    username: z.string().min(1).max(64),
-  })
+  .object({ password: z.string().min(1).max(256), username: z.string().min(1).max(64) })
   .passthrough();
 export const CreateSessionResponse = z
   .object({ expires_in: z.number().int().gte(0), token: z.string() })
   .passthrough();
 export const AppSettings = z
-  .object({
-    check_interval_secs: z.number().int().gte(0),
-    welcome_message: z.string(),
-  })
+  .object({ check_interval_secs: z.number().int().gte(0), welcome_message: z.string() })
   .passthrough();
 export const IntegrationsSettings = z
   .object({ example_api_base: z.string(), example_api_key_is_set: z.boolean() })

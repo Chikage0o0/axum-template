@@ -10,32 +10,26 @@ export type AuthState = {
   flash: Flash | null;
 };
 
-function readTokenFromStorage(): string | null {
-  try {
-    return localStorage.getItem("token");
-  } catch {
-    return null;
-  }
-}
-
-const initialToken = typeof window === "undefined" ? null : readTokenFromStorage();
-
-const store = writable<AuthState>({
-  isAuthenticated: Boolean(initialToken),
-  token: initialToken,
+const initialState: AuthState = {
+  isAuthenticated: false,
+  token: null,
   user: null,
   flash: null,
+};
+
+let currentState = initialState;
+
+const store = writable<AuthState>(initialState);
+store.subscribe((next) => {
+  currentState = next;
 });
 
 export const auth = {
   subscribe: store.subscribe,
-  readTokenFromStorage,
+  readTokenFromStorage() {
+    return currentState.token;
+  },
   login(token: string) {
-    try {
-      localStorage.setItem("token", token);
-    } catch {
-      // ignore
-    }
     store.set({
       isAuthenticated: true,
       token,
@@ -44,12 +38,6 @@ export const auth = {
     });
   },
   logout(opts?: { reason?: "expired" | "manual" }) {
-    try {
-      localStorage.removeItem("token");
-    } catch {
-      // ignore
-    }
-
     const flash =
       opts?.reason === "expired"
         ? { title: "登录失效", message: "令牌已过期或无效，请重新登录" }

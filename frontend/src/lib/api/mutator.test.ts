@@ -108,4 +108,58 @@ describe("apiClient", () => {
     expect(get(auth).isAuthenticated).toBeFalse();
     expect(get(auth).token).toBeNull();
   });
+
+  it("令牌失效后应尝试刷新并自动重试原请求", async () => {
+    auth.login("token-old");
+
+    let calls = 0;
+    globalThis.fetch = async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      calls += 1;
+
+      if (url === "/api/v1/settings") {
+        if (calls === 1) {
+          return new Response(
+            JSON.stringify({
+              code: 1001,
+              message: "身份验证失败: Token 无效或已过期",
+              request_id: "req_3",
+            }),
+            {
+              status: 401,
+              headers: { "content-type": "application/json" },
+            },
+          );
+        }
+
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      if (url === "/api/v1/sessions/refresh") {
+        return new Response(
+          JSON.stringify({
+            token: "token-new",
+            expires_in: 900,
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        );
+      }
+
+      return new Response(null, { status: 404 });
+    };
+
+    const data = await apiClient<{ ok: boolean }>("/api/v1/settings", {
+      method: "GET",
+    });
+
+    expect(data.ok).toBeTrue();
+    expect(get(auth).isAuthenticated).toBeTrue();
+    expect(get(auth).token).toBe("token-new");
+  });
 });
