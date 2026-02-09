@@ -6,7 +6,7 @@
   import NavMain from "./nav-main.svelte";
   import NavUser from "./nav-user.svelte";
   import * as Sidebar from "$lib/shadcn/components/ui/sidebar/index.js";
-  import type { AuthUser } from "$lib/types/auth-user";
+  import type { AuthUser } from "$lib/features/auth/model/auth-user";
 
   const navMain = [
     {

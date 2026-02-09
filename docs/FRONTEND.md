@@ -6,6 +6,15 @@
 - 登录后会获取 `GET /api/v1/users/me` 同步当前用户信息到前端状态
 - 演示统一 API 调用封装（自动带 token、401 错误码 `1001` 时先尝试 refresh，失败后自动登出）
 
+## 目录组织约定
+
+- `src/routes/(public)`：公开页面（登录等）
+- `src/routes/(app)`：登录后页面（仪表盘、设置等）
+- `src/lib/features/*`：按业务域聚合（例如 `features/auth`）
+- `src/lib/app/*`：应用壳层组件（Sidebar、导航、用户菜单）
+- `src/lib/shared/*`：跨业务复用（`components/forms/utils`）
+- `src/lib/api/generated/*`：OpenAPI 自动生成产物，禁止手改
+
 ## UI 组件策略（shadcn-svelte 优先）
 
 - 前端页面与交互开发必须优先复用 shadcn-svelte 组件。

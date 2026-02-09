@@ -1,5 +1,5 @@
 import type { PatchUserRequest, UserResponse } from "$lib/api/generated/client";
-import type { AuthUser } from "$lib/types/auth-user";
+import type { AuthUser } from "$lib/features/auth/model/auth-user";
 
 export type User = UserResponse;
 

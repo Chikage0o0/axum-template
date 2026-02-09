@@ -9,19 +9,19 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::api::auth::auth_middleware;
-use crate::api::handlers::security::patch_current_user_password_handler;
-use crate::api::handlers::sessions::{
-    create_session_handler, delete_current_session_handler, refresh_session_handler,
-};
-use crate::api::handlers::settings::{get_settings_handler, patch_settings_handler};
-use crate::api::handlers::users::{
-    create_user_handler, create_user_identity_handler, delete_user_identity_handler,
-    get_current_user_handler, get_users_handler, patch_user_handler,
-};
 use crate::api::openapi::ApiDoc;
 use crate::config::runtime::RuntimeConfig;
 use crate::db::DbPool;
 use crate::error::AppError;
+use crate::modules::security::handlers::patch_current_user_password_handler;
+use crate::modules::sessions::handlers::{
+    create_session_handler, delete_current_session_handler, refresh_session_handler,
+};
+use crate::modules::settings::handlers::{get_settings_handler, patch_settings_handler};
+use crate::modules::users::handlers::{
+    create_user_handler, create_user_identity_handler, delete_user_identity_handler,
+    get_current_user_handler, get_users_handler, patch_user_handler,
+};
 use crate::web_assets::{serve_frontend_index, serve_frontend_path};
 
 #[derive(Clone)]
@@ -193,7 +193,7 @@ mod tests {
         let password_hash =
             crate::password::hash_password_argon2id(password).expect("生成测试用户密码哈希失败");
 
-        sqlx::query_scalar::<_, Uuid>(
+        sqlx::query_scalar!(
             r#"
 INSERT INTO users (
     username,
@@ -207,11 +207,11 @@ INSERT INTO users (
 VALUES ($1, $2, $3, TRUE, '{}'::jsonb, $4, 0)
 RETURNING id
             "#,
+            username,
+            format!("{username}-display"),
+            format!("{username}@example.invalid"),
+            password_hash,
         )
-        .bind(username)
-        .bind(format!("{username}-display"))
-        .bind(format!("{username}@example.invalid"))
-        .bind(password_hash)
         .fetch_one(pool)
         .await
         .expect("创建测试用户失败")
@@ -275,7 +275,7 @@ RETURNING id
             .expect("执行迁移失败");
 
         let jwt_secret = format!("e2e-secret-{}", Uuid::new_v4());
-        sqlx::query(
+        sqlx::query!(
             r#"
 INSERT INTO system_config (key, value, description)
 VALUES ('security.jwt_secret', $1, 'e2e test secret')
@@ -283,8 +283,8 @@ ON CONFLICT (key) DO UPDATE
 SET value = EXCLUDED.value,
     updated_at = NOW()
             "#,
+            Value::String(jwt_secret),
         )
-        .bind(Value::String(jwt_secret))
         .execute(&pool)
         .await
         .expect("写入测试 jwt secret 失败");
@@ -380,17 +380,21 @@ SET value = EXCLUDED.value,
         .await;
         assert_eq!(refresh_b_old_response.status(), StatusCode::OK);
 
-        sqlx::query("DELETE FROM auth_sessions WHERE user_id = $1 OR user_id = $2")
-            .bind(user_a_id)
-            .bind(user_b_id)
-            .execute(&pool)
-            .await
-            .expect("清理测试会话失败");
-        sqlx::query("DELETE FROM users WHERE id = $1 OR id = $2")
-            .bind(user_a_id)
-            .bind(user_b_id)
-            .execute(&pool)
-            .await
-            .expect("清理测试用户失败");
+        sqlx::query!(
+            "DELETE FROM auth_sessions WHERE user_id = $1 OR user_id = $2",
+            user_a_id,
+            user_b_id
+        )
+        .execute(&pool)
+        .await
+        .expect("清理测试会话失败");
+        sqlx::query!(
+            "DELETE FROM users WHERE id = $1 OR id = $2",
+            user_a_id,
+            user_b_id
+        )
+        .execute(&pool)
+        .await
+        .expect("清理测试用户失败");
     }
 }

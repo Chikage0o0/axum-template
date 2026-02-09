@@ -2,7 +2,10 @@ use serde::Serialize;
 use utoipa::openapi::security::{Http, HttpAuthScheme, SecurityScheme};
 use utoipa::{Modify, OpenApi, ToSchema};
 
-use crate::api::handlers::{security as security_handlers, sessions, settings, users};
+use crate::modules::security::handlers as security_handlers;
+use crate::modules::sessions::handlers as sessions;
+use crate::modules::settings::handlers as settings;
+use crate::modules::users::handlers as users;
 
 /// 失败时的统一错误体（与 `AppError` 的序列化保持一致）。
 #[derive(Debug, Serialize, ToSchema)]

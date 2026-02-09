@@ -10,10 +10,10 @@
     toFieldErrorItems,
     type FieldErrors,
     zodErrorToFieldErrors,
-  } from "$lib/forms/field-errors";
+  } from "$lib/shared/forms/field-errors";
   import { ApiError } from "$lib/api/mutator";
-  import { auth } from "$lib/stores/auth";
-  import PasswordInput from "$lib/components/password-input.svelte";
+  import { auth } from "$lib/features/auth/state/auth";
+  import PasswordInput from "$lib/shared/components/password-input.svelte";
   import { Button } from "$lib/shadcn/components/ui/button/index.js";
   import * as Card from "$lib/shadcn/components/ui/card/index.js";
   import * as Field from "$lib/shadcn/components/ui/field/index.js";

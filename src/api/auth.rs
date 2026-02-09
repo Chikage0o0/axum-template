@@ -8,8 +8,8 @@ use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::api::routes::AppState;
 use crate::error::AppError;
+use crate::http::router::AppState;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
@@ -66,7 +66,8 @@ pub async fn auth_middleware(
     let session_id = Uuid::parse_str(&token_data.claims.sid)
         .map_err(|_| AppError::auth_token("Token 无效或已过期"))?;
 
-    let auth_row = sqlx::query_as::<_, AuthCheckRow>(
+    let auth_row = sqlx::query_as!(
+        AuthCheckRow,
         r#"
 SELECT
     u.auth_version,
@@ -80,9 +81,9 @@ WHERE u.id = $1
   AND u.is_active = TRUE
 LIMIT 1
         "#,
+        user_id,
+        session_id,
     )
-    .bind(user_id)
-    .bind(session_id)
     .fetch_optional(&state.db)
     .await
     .map_err(|e| AppError::InternalError(format!("查询鉴权状态失败: {e}")))?

@@ -19,7 +19,7 @@ pub async fn upsert_many(
         .map_err(|e| AppError::InternalError(format!("开启事务失败: {e}")))?;
 
     for (key, value) in changes {
-        sqlx::query(
+        sqlx::query!(
             r#"
 INSERT INTO system_config (key, value)
 VALUES ($1, $2)
@@ -27,9 +27,9 @@ ON CONFLICT (key) DO UPDATE
 SET value = EXCLUDED.value,
     updated_at = NOW()
             "#,
+            key,
+            value,
         )
-        .bind(key)
-        .bind(value)
         .execute(&mut *tx)
         .await
         .map_err(|e| AppError::InternalError(format!("写入 system_config 失败: {e}")))?;

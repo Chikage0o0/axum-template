@@ -1,5 +1,5 @@
 import { writable } from "svelte/store";
-import type { AuthUser } from "$lib/types/auth-user";
+import type { AuthUser } from "$lib/features/auth/model/auth-user";
 
 export type Flash = { title: string; message: string };
 

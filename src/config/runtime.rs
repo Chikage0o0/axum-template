@@ -71,13 +71,10 @@ impl RuntimeConfig {
 }
 
 async fn get_value(pool: &DbPool, key: &str) -> Result<Option<serde_json::Value>> {
-    let value = sqlx::query_scalar::<_, serde_json::Value>(
-        "SELECT value FROM system_config WHERE key = $1",
-    )
-    .bind(key)
-    .fetch_optional(pool)
-    .await
-    .context("查询 system_config 失败")?;
+    let value = sqlx::query_scalar!("SELECT value FROM system_config WHERE key = $1", key)
+        .fetch_optional(pool)
+        .await
+        .context("查询 system_config 失败")?;
 
     Ok(value)
 }

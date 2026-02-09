@@ -12,8 +12,8 @@ use uuid::Uuid;
 
 use crate::api::auth::Claims;
 use crate::api::auth::CurrentUser;
-use crate::api::routes::AppState;
 use crate::error::AppError;
+use crate::http::router::AppState;
 
 const ACCESS_TOKEN_EXPIRES_IN_SECS: u64 = 15 * 60;
 const REFRESH_TOKEN_EXPIRES_IN_SECS: i64 = 30 * 24 * 60 * 60;
@@ -104,7 +104,7 @@ pub async fn create_session_handler(
         .map_err(|e| AppError::InternalError(format!("refresh token 哈希失败: {e}")))?;
     let refresh_expires_at = Utc::now() + Duration::seconds(REFRESH_TOKEN_EXPIRES_IN_SECS);
 
-    sqlx::query(
+    sqlx::query!(
         r#"
 INSERT INTO auth_sessions (
     id,
@@ -116,11 +116,11 @@ INSERT INTO auth_sessions (
 )
 VALUES ($1, $2, $3, $4, NULL, NULL)
         "#,
+        session_id,
+        user.id,
+        refresh_secret_hash,
+        refresh_expires_at,
     )
-    .bind(session_id)
-    .bind(user.id)
-    .bind(refresh_secret_hash)
-    .bind(refresh_expires_at)
     .execute(&mut *tx)
     .await
     .map_err(|e| AppError::InternalError(format!("创建会话失败: {e}")))?;
@@ -184,7 +184,7 @@ pub async fn refresh_session_handler(
         .map_err(|e| AppError::InternalError(format!("refresh token 哈希失败: {e}")))?;
     let next_refresh_expires_at = now + Duration::seconds(REFRESH_TOKEN_EXPIRES_IN_SECS);
 
-    let updated = sqlx::query(
+    let updated = sqlx::query!(
         r#"
 UPDATE auth_sessions
 SET refresh_secret_hash = $2,
@@ -193,10 +193,10 @@ SET refresh_secret_hash = $2,
 WHERE id = $1
   AND revoked_at IS NULL
         "#,
+        session_id,
+        next_refresh_secret_hash,
+        next_refresh_expires_at,
     )
-    .bind(session_id)
-    .bind(next_refresh_secret_hash)
-    .bind(next_refresh_expires_at)
     .execute(&mut *tx)
     .await
     .map_err(|e| AppError::InternalError(format!("轮换会话失败: {e}")))?;
@@ -236,7 +236,7 @@ pub async fn delete_current_session_handler(
     axum::extract::Extension(current_user): axum::extract::Extension<CurrentUser>,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, AppError> {
-    sqlx::query(
+    sqlx::query!(
         r#"
 UPDATE auth_sessions
 SET revoked_at = NOW(),
@@ -246,9 +246,9 @@ WHERE id = $1
   AND user_id = $2
   AND revoked_at IS NULL
         "#,
+        current_user.session_id,
+        current_user.user_id,
     )
-    .bind(current_user.session_id)
-    .bind(current_user.user_id)
     .execute(&state.db)
     .await
     .map_err(|e| AppError::InternalError(format!("退出当前会话失败: {e}")))?;
@@ -399,15 +399,16 @@ struct LoginUserRow {
 }
 
 async fn load_login_user(state: &AppState, username: &str) -> Result<LoginUserRow, AppError> {
-    let user = sqlx::query_as::<_, LoginUserRow>(
+    let user = sqlx::query_as!(
+        LoginUserRow,
         r#"
 SELECT id, display_name, email, password_hash, is_active, auth_version
 FROM users
 WHERE username = $1
 LIMIT 1
         "#,
+        username,
     )
-    .bind(username)
     .fetch_optional(&state.db)
     .await
     .map_err(|e| AppError::InternalError(format!("查询登录用户失败: {e}")))?;
@@ -429,11 +430,12 @@ struct AuthSessionRow {
 }
 
 async fn load_auth_session(state: &AppState, session_id: Uuid) -> Result<AuthSessionRow, AppError> {
-    let row = sqlx::query_as::<_, AuthSessionRow>(
+    let row = sqlx::query_as!(
+        AuthSessionRow,
         r#"
 SELECT
     s.user_id,
-    u.username,
+    u.username AS "username!",
     u.display_name,
     u.email,
     u.is_active AS user_is_active,
@@ -446,8 +448,8 @@ INNER JOIN users u ON u.id = s.user_id
 WHERE s.id = $1
 LIMIT 1
         "#,
+        session_id,
     )
-    .bind(session_id)
     .fetch_optional(&state.db)
     .await
     .map_err(|e| AppError::InternalError(format!("查询会话失败: {e}")))?;

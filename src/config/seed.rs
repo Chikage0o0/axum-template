@@ -34,12 +34,13 @@ pub async fn seed_if_needed(pool: &DbPool, opts: &SeedOptions) -> Result<()> {
 }
 
 async fn ensure_jwt_secret_exists(pool: &DbPool) -> Result<()> {
-    let exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM system_config WHERE key = 'security.jwt_secret')",
+    let exists_row = sqlx::query!(
+        "SELECT EXISTS (SELECT 1 FROM system_config WHERE key = 'security.jwt_secret') AS \"exists!\""
     )
     .fetch_one(pool)
     .await
     .context("检查 security.jwt_secret 是否存在失败")?;
+    let exists = exists_row.exists;
 
     if exists {
         return Ok(());
@@ -49,17 +50,17 @@ async fn ensure_jwt_secret_exists(pool: &DbPool) -> Result<()> {
     OsRng.fill_bytes(&mut bytes);
     let secret_hex = hex_encode(&bytes);
 
-    let inserted: Option<String> = sqlx::query_scalar(
+    let inserted: Option<String> = sqlx::query_scalar!(
         r#"
 INSERT INTO system_config (key, value, description)
 VALUES ($1, $2, $3)
 ON CONFLICT (key) DO NOTHING
 RETURNING key
 "#,
+        "security.jwt_secret",
+        serde_json::Value::String(secret_hex),
+        "JWT 签名密钥（hex），用于 HS256",
     )
-    .bind("security.jwt_secret")
-    .bind(serde_json::Value::String(secret_hex))
-    .bind("JWT 签名密钥（hex），用于 HS256")
     .fetch_optional(pool)
     .await
     .context("写入 security.jwt_secret 失败")?;
@@ -131,15 +132,16 @@ fn resolve_admin_username(opts: &SeedOptions) -> String {
 }
 
 async fn load_admin_user(pool: &DbPool, username: &str) -> Result<Option<AdminUserRow>> {
-    let user = sqlx::query_as::<_, AdminUserRow>(
+    let user = sqlx::query_as!(
+        AdminUserRow,
         r#"
 SELECT password_hash
 FROM users
 WHERE username = $1
 LIMIT 1
         "#,
+        username,
     )
-    .bind(username)
     .fetch_optional(pool)
     .await
     .context("查询管理员用户失败")?;
@@ -148,7 +150,7 @@ LIMIT 1
 }
 
 async fn load_legacy_admin_password_hash(pool: &DbPool) -> Result<Option<String>> {
-    let value: Option<serde_json::Value> = sqlx::query_scalar(
+    let value: Option<serde_json::Value> = sqlx::query_scalar!(
         "SELECT value FROM system_config WHERE key = 'security.admin_password_hash'",
     )
     .fetch_optional(pool)
@@ -200,7 +202,7 @@ async fn try_upsert_admin_user(
     email: &str,
     password_hash: &str,
 ) -> Result<()> {
-    sqlx::query(
+    sqlx::query!(
         r#"
 INSERT INTO users (
     username,
@@ -216,11 +218,11 @@ SET password_hash = COALESCE(NULLIF(users.password_hash, ''), EXCLUDED.password_
     is_active = TRUE,
     updated_at = NOW()
         "#,
+        username,
+        "Administrator",
+        email,
+        password_hash,
     )
-    .bind(username)
-    .bind("Administrator")
-    .bind(email)
-    .bind(password_hash)
     .execute(pool)
     .await
     .context("upsert 管理员用户失败")?;

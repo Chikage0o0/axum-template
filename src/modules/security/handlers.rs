@@ -5,8 +5,8 @@ use serde::Deserialize;
 use utoipa::ToSchema;
 
 use crate::api::auth::CurrentUser;
-use crate::api::routes::AppState;
 use crate::error::AppError;
+use crate::http::router::AppState;
 
 #[derive(Debug, Deserialize, ToSchema, Validate)]
 pub struct PatchCurrentUserPasswordRequest {
@@ -59,7 +59,7 @@ pub async fn patch_current_user_password_handler(
         .await
         .map_err(|e| AppError::InternalError(format!("开启改密事务失败: {e}")))?;
 
-    let updated = sqlx::query(
+    let updated = sqlx::query!(
         r#"
 UPDATE users
 SET password_hash = $2,
@@ -67,9 +67,9 @@ SET password_hash = $2,
     updated_at = NOW()
 WHERE id = $1
         "#,
+        current_user.user_id,
+        hash,
     )
-    .bind(current_user.user_id)
-    .bind(hash)
     .execute(&mut *tx)
     .await
     .map_err(|e| AppError::InternalError(format!("更新当前用户密码失败: {e}")))?;
@@ -80,7 +80,7 @@ WHERE id = $1
         )));
     }
 
-    sqlx::query(
+    sqlx::query!(
         r#"
 UPDATE auth_sessions
 SET revoked_at = NOW(),
@@ -89,8 +89,8 @@ SET revoked_at = NOW(),
 WHERE user_id = $1
   AND revoked_at IS NULL
         "#,
+        current_user.user_id,
     )
-    .bind(current_user.user_id)
     .execute(&mut *tx)
     .await
     .map_err(|e| AppError::InternalError(format!("撤销用户会话失败: {e}")))?;
@@ -106,15 +106,15 @@ async fn load_current_user_password_hash(
     state: &AppState,
     user_id: uuid::Uuid,
 ) -> Result<String, AppError> {
-    let hash = sqlx::query_scalar::<_, Option<String>>(
+    let hash = sqlx::query_scalar!(
         r#"
 SELECT password_hash
 FROM users
 WHERE id = $1
 LIMIT 1
         "#,
+        user_id,
     )
-    .bind(user_id)
     .fetch_optional(&state.db)
     .await
     .map_err(|e| AppError::InternalError(format!("读取当前用户密码失败: {e}")))?

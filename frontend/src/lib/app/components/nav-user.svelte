@@ -23,15 +23,15 @@
     toFieldErrorItems,
     type FieldErrors,
     zodErrorToFieldErrors,
-  } from "$lib/forms/field-errors";
-  import { validatePasswordChangeForm } from "$lib/forms/password-change";
-  import { auth } from "$lib/stores/auth";
+  } from "$lib/shared/forms/field-errors";
+  import { validatePasswordChangeForm } from "$lib/shared/forms/password-change";
+  import { auth } from "$lib/features/auth/state/auth";
   import {
     buildCurrentUserPatchPayload,
     toAuthUser,
     type CurrentUserDraft,
-  } from "$lib/utils/user-helpers";
-  import PasswordInput from "./password-input.svelte";
+  } from "$lib/features/auth/model/user-helpers";
+  import PasswordInput from "$lib/shared/components/password-input.svelte";
   import { Button } from "$lib/shadcn/components/ui/button/index.js";
   import * as Dialog from "$lib/shadcn/components/ui/dialog/index.js";
   import * as Field from "$lib/shadcn/components/ui/field/index.js";

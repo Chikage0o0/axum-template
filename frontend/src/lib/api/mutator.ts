@@ -1,4 +1,4 @@
-import { auth } from "$lib/stores/auth";
+import { auth } from "$lib/features/auth/state/auth";
 
 export type ApiErrorBody = {
   code?: number;

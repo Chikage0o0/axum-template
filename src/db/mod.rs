@@ -9,8 +9,8 @@ pub async fn connect(database_url: &str) -> Result<DbPool, AppError> {
         .await
         .map_err(|e| AppError::InternalError(format!("数据库连接失败: {e}")))?;
 
-    sqlx::query("SELECT 1")
-        .execute(&pool)
+    sqlx::query_scalar!("SELECT 1")
+        .fetch_one(&pool)
         .await
         .map_err(|e| AppError::InternalError(format!("数据库探测失败: {e}")))?;
 

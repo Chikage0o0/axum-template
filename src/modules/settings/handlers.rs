@@ -4,8 +4,8 @@ use garde::Validate;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::api::routes::AppState;
 use crate::error::AppError;
+use crate::http::router::AppState;
 use crate::services::system_config;
 
 #[derive(Debug, Serialize, ToSchema)]

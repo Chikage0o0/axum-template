@@ -16,8 +16,8 @@
     toFieldErrorItems,
     type FieldErrors,
     zodErrorToFieldErrors,
-  } from "$lib/forms/field-errors";
-  import PasswordInput from "$lib/components/password-input.svelte";
+  } from "$lib/shared/forms/field-errors";
+  import PasswordInput from "$lib/shared/components/password-input.svelte";
   import * as Alert from "$lib/shadcn/components/ui/alert/index.js";
   import { Button } from "$lib/shadcn/components/ui/button/index.js";
   import * as Card from "$lib/shadcn/components/ui/card/index.js";

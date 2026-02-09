@@ -10,9 +10,9 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::api::auth::CurrentUser;
-use crate::api::routes::AppState;
 use crate::db::DbPool;
 use crate::error::AppError;
+use crate::http::router::AppState;
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct UserResponse {
@@ -382,7 +382,8 @@ struct UserIdentityRow {
 }
 
 async fn list_users(db: &DbPool) -> Result<Vec<UserResponse>, AppError> {
-    let users: Vec<UserRow> = sqlx::query_as(
+    let users: Vec<UserRow> = sqlx::query_as!(
+        UserRow,
         r#"
 SELECT
     id,
@@ -429,7 +430,8 @@ ORDER BY created_at DESC
 }
 
 async fn get_user_by_id(db: &DbPool, user_id: Uuid) -> Result<UserResponse, AppError> {
-    let row = sqlx::query_as::<_, UserRow>(
+    let row = sqlx::query_as!(
+        UserRow,
         r#"
 SELECT
     id,
@@ -446,8 +448,8 @@ FROM users
 WHERE id = $1
 LIMIT 1
         "#,
+        user_id,
     )
-    .bind(user_id)
     .fetch_optional(db)
     .await
     .map_err(|e| AppError::InternalError(format!("查询用户失败: {e}")))?
@@ -476,7 +478,8 @@ async fn create_user(db: &DbPool, payload: CreateUserRequest) -> Result<UserResp
         .await
         .map_err(|e| AppError::InternalError(format!("开启用户创建事务失败: {e}")))?;
 
-    let row: UserRow = sqlx::query_as(
+    let row: UserRow = sqlx::query_as!(
+        UserRow,
         r#"
 INSERT INTO users (
     username,
@@ -499,13 +502,13 @@ RETURNING
     created_at,
     updated_at
         "#,
+        payload.username,
+        payload.display_name,
+        payload.email,
+        payload.phone,
+        payload.avatar_url,
+        payload.metadata.unwrap_or_else(|| serde_json::json!({})),
     )
-    .bind(payload.username)
-    .bind(payload.display_name)
-    .bind(payload.email)
-    .bind(payload.phone)
-    .bind(payload.avatar_url)
-    .bind(payload.metadata.unwrap_or_else(|| serde_json::json!({})))
     .fetch_one(&mut *tx)
     .await
     .map_err(|e| map_user_db_error("创建用户失败", e))?;
@@ -551,7 +554,8 @@ async fn patch_user(
         return Err(AppError::validation("至少需要提供一个可更新字段"));
     }
 
-    let row = sqlx::query_as::<_, UserRow>(
+    let row = sqlx::query_as!(
+        UserRow,
         r#"
 UPDATE users
 SET
@@ -576,15 +580,15 @@ RETURNING
     created_at,
     updated_at
         "#,
+        user_id,
+        payload.username,
+        payload.display_name,
+        payload.email,
+        payload.phone,
+        payload.avatar_url,
+        payload.is_active,
+        payload.metadata,
     )
-    .bind(user_id)
-    .bind(payload.username)
-    .bind(payload.display_name)
-    .bind(payload.email)
-    .bind(payload.phone)
-    .bind(payload.avatar_url)
-    .bind(payload.is_active)
-    .bind(payload.metadata)
     .fetch_optional(db)
     .await
     .map_err(|e| map_user_db_error("更新用户失败", e))?
@@ -612,16 +616,20 @@ async fn create_user_identity(
     user_id: Uuid,
     payload: CreateUserIdentityRequest,
 ) -> Result<UserIdentityResponse, AppError> {
-    let exists: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM users WHERE id = $1)")
-        .bind(user_id)
-        .fetch_one(db)
-        .await
-        .map_err(|e| AppError::InternalError(format!("检查用户存在性失败: {e}")))?;
+    let exists_row = sqlx::query!(
+        "SELECT EXISTS (SELECT 1 FROM users WHERE id = $1) AS \"exists!\"",
+        user_id
+    )
+    .fetch_one(db)
+    .await
+    .map_err(|e| AppError::InternalError(format!("检查用户存在性失败: {e}")))?;
+    let exists = exists_row.exists;
     if !exists {
         return Err(AppError::NotFound(format!("用户不存在: {user_id}")));
     }
 
-    let row = sqlx::query_as::<_, UserIdentityRow>(
+    let row = sqlx::query_as!(
+        UserIdentityRow,
         r#"
 INSERT INTO user_identities (
     user_id,
@@ -650,16 +658,16 @@ RETURNING
     updated_at,
     last_login_at
         "#,
+        user_id,
+        normalize_provider_segment(&payload.provider_kind),
+        normalize_provider_segment(&payload.provider_name),
+        payload.provider_user_id,
+        payload.provider_username,
+        payload.provider_email,
+        payload.oidc_issuer,
+        payload.oidc_subject,
+        payload.metadata.unwrap_or_else(|| serde_json::json!({})),
     )
-    .bind(user_id)
-    .bind(normalize_provider_segment(&payload.provider_kind))
-    .bind(normalize_provider_segment(&payload.provider_name))
-    .bind(payload.provider_user_id)
-    .bind(payload.provider_username)
-    .bind(payload.provider_email)
-    .bind(payload.oidc_issuer)
-    .bind(payload.oidc_subject)
-    .bind(payload.metadata.unwrap_or_else(|| serde_json::json!({})))
     .fetch_one(db)
     .await
     .map_err(|e| map_user_db_error("绑定外部账号失败", e))?;
@@ -672,12 +680,14 @@ async fn delete_user_identity(
     user_id: Uuid,
     identity_id: Uuid,
 ) -> Result<(), AppError> {
-    let result = sqlx::query("DELETE FROM user_identities WHERE id = $1 AND user_id = $2")
-        .bind(identity_id)
-        .bind(user_id)
-        .execute(db)
-        .await
-        .map_err(|e| AppError::InternalError(format!("删除外部账号连接失败: {e}")))?;
+    let result = sqlx::query!(
+        "DELETE FROM user_identities WHERE id = $1 AND user_id = $2",
+        identity_id,
+        user_id
+    )
+    .execute(db)
+    .await
+    .map_err(|e| AppError::InternalError(format!("删除外部账号连接失败: {e}")))?;
 
     if result.rows_affected() == 0 {
         return Err(AppError::NotFound(format!(
@@ -693,7 +703,8 @@ async fn insert_identity_row(
     user_id: Uuid,
     payload: CreateUserIdentityRequest,
 ) -> Result<UserIdentityRow, AppError> {
-    sqlx::query_as::<_, UserIdentityRow>(
+    sqlx::query_as!(
+        UserIdentityRow,
         r#"
 INSERT INTO user_identities (
     user_id,
@@ -722,16 +733,16 @@ RETURNING
     updated_at,
     last_login_at
         "#,
+        user_id,
+        normalize_provider_segment(&payload.provider_kind),
+        normalize_provider_segment(&payload.provider_name),
+        payload.provider_user_id,
+        payload.provider_username,
+        payload.provider_email,
+        payload.oidc_issuer,
+        payload.oidc_subject,
+        payload.metadata.unwrap_or_else(|| serde_json::json!({})),
     )
-    .bind(user_id)
-    .bind(normalize_provider_segment(&payload.provider_kind))
-    .bind(normalize_provider_segment(&payload.provider_name))
-    .bind(payload.provider_user_id)
-    .bind(payload.provider_username)
-    .bind(payload.provider_email)
-    .bind(payload.oidc_issuer)
-    .bind(payload.oidc_subject)
-    .bind(payload.metadata.unwrap_or_else(|| serde_json::json!({})))
     .fetch_one(&mut **tx)
     .await
     .map_err(|e| map_user_db_error("创建用户身份连接失败", e))
@@ -741,7 +752,8 @@ async fn list_identities_by_user_id(
     db: &DbPool,
     user_id: Uuid,
 ) -> Result<Vec<UserIdentityResponse>, AppError> {
-    let rows = sqlx::query_as::<_, UserIdentityRow>(
+    let rows = sqlx::query_as!(
+        UserIdentityRow,
         r#"
 SELECT
     id,
@@ -761,8 +773,8 @@ FROM user_identities
 WHERE user_id = $1
 ORDER BY created_at ASC
         "#,
+        user_id,
     )
-    .bind(user_id)
     .fetch_all(db)
     .await
     .map_err(|e| AppError::InternalError(format!("查询用户身份连接失败: {e}")))?;
@@ -774,7 +786,8 @@ async fn list_identities_by_user_ids(
     db: &DbPool,
     user_ids: &[Uuid],
 ) -> Result<HashMap<Uuid, Vec<UserIdentityResponse>>, AppError> {
-    let rows = sqlx::query_as::<_, UserIdentityRow>(
+    let rows = sqlx::query_as!(
+        UserIdentityRow,
         r#"
 SELECT
     id,
@@ -791,11 +804,11 @@ SELECT
     updated_at,
     last_login_at
 FROM user_identities
-WHERE user_id = ANY($1)
+WHERE user_id = ANY($1::uuid[])
 ORDER BY created_at ASC
         "#,
+        &user_ids[..],
     )
-    .bind(user_ids)
     .fetch_all(db)
     .await
     .map_err(|e| AppError::InternalError(format!("批量查询用户身份连接失败: {e}")))?;

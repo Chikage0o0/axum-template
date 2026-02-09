@@ -15,16 +15,19 @@ in
 
   env.DATABASE_URL = lib.mkDefault "postgres://${dbUser}:${dbPass}@localhost/${dbName}?host=${config.env.PGHOST}";
   env.OPENSSL_DIR = "${pkgs.openssl.dev}";
+  env.PGUSER = dbUser;
+  env.PGPASSWORD = dbPass;
+  env.PGDATABASE = dbName;
   env.OPENSSL_NO_VENDOR = "1";
 
   packages = [
     pkgs.pkg-config
     pkgs.openssl
     pkgs.sqlx-cli
-    pkgs.cargo-watch
     pkgs.cargo-edit
     pkgs.bacon
     pkgs.taplo
+    pkgs.pgcli
   ];
 
   languages.javascript = {
@@ -85,6 +88,7 @@ in
   '';
   scripts.openapi-gen.exec = "cargo run --quiet -- --export-openapi > docs/openapi.json && (cd frontend && bun run gen:api)";
   scripts.openapi-check.exec = "cargo run --quiet -- --export-openapi > docs/openapi.json && (cd frontend && bun run gen:api && bun run check:api-usage) && git diff --exit-code";
+  scripts.pre-git-check.exec = "bash pre-commit-check.sh";
   scripts.frontend-dev.exec = "cd frontend && bun run dev";
   scripts.process-up.exec = "devenv processes up --detach";
   scripts.process-down.exec = "devenv processes down";
@@ -108,6 +112,7 @@ in
     echo "  db-migrate"
     echo "  dev-fmt"
     echo "  dev-fmt-check"
+    echo "  pre-git-check"
     echo "  backend-dev"
     echo "  frontend-dev"
   '';

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { get } from "svelte/store";
 
-import { auth } from "../stores/auth";
+import { auth } from "$lib/features/auth/state/auth";
 import { ApiError, apiClient } from "./mutator";
 
 type MemoryStorage = {
