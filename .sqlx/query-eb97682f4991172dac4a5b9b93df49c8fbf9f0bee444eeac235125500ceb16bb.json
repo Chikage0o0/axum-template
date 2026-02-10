@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\nSELECT\n    s.user_id,\n    u.username AS \"username!\",\n    u.display_name,\n    u.email,\n    u.is_active AS user_is_active,\n    u.auth_version,\n    s.refresh_secret_hash,\n    s.expires_at,\n    s.revoked_at\nFROM auth_sessions s\nINNER JOIN users u ON u.id = s.user_id\nWHERE s.id = $1\nLIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "username!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "display_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "email",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "user_is_active",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "auth_version",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "refresh_secret_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "expires_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "revoked_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "eb97682f4991172dac4a5b9b93df49c8fbf9f0bee444eeac235125500ceb16bb"
+}

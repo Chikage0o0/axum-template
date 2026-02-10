@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\nUPDATE auth_sessions\nSET refresh_secret_hash = $2,\n    expires_at = $3,\n    updated_at = NOW()\nWHERE id = $1\n  AND revoked_at IS NULL\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "20687095e09d32413fa6b378482b3c140dc7deb2799e26f64f4ab4c29ce4ba89"
+}
