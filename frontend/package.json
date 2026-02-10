@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "prepare": "svelte-kit sync || echo ''",
+    "build": "vite build",
     "lint": "eslint . --max-warnings=0",
     "test": "bun test"
   },
