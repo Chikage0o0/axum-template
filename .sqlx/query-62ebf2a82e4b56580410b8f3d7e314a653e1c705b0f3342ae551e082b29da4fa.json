@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\nINSERT INTO system_config (key, value, description)\nVALUES ('security.jwt_secret', $1, 'e2e test secret')\nON CONFLICT (key) DO UPDATE\nSET value = EXCLUDED.value,\n    updated_at = NOW()\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "62ebf2a82e4b56580410b8f3d7e314a653e1c705b0f3342ae551e082b29da4fa"
+}

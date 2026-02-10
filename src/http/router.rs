@@ -226,6 +226,11 @@ RETURNING id
         let password_hash =
             crate::password::hash_password_argon2id(password).expect("生成测试用户密码哈希失败");
 
+        sqlx::query!("DELETE FROM users WHERE username = $1", username)
+            .execute(pool)
+            .await
+            .expect("清理同名测试用户失败");
+
         sqlx::query_scalar!(
             r#"
 INSERT INTO users (
@@ -238,13 +243,6 @@ INSERT INTO users (
     auth_version
 )
 VALUES ($1, $2, $3, TRUE, '{}'::jsonb, $4, 0)
-ON CONFLICT (username) DO UPDATE
-SET
-    display_name = EXCLUDED.display_name,
-    email = EXCLUDED.email,
-    is_active = TRUE,
-    password_hash = EXCLUDED.password_hash,
-    updated_at = NOW()
 RETURNING id
             "#,
             username,
@@ -254,7 +252,7 @@ RETURNING id
         )
         .fetch_one(pool)
         .await
-        .expect("创建或更新测试用户失败")
+        .expect("创建测试用户失败")
     }
 
     async fn cleanup_test_users(pool: &crate::db::DbPool, user_ids: &[Uuid]) {
