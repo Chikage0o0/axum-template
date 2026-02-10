@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolve } from "$app/paths";
   import CommandIcon from "@lucide/svelte/icons/command";
   import LayoutDashboardIcon from "@lucide/svelte/icons/layout-dashboard";
   import Settings2Icon from "@lucide/svelte/icons/settings-2";
@@ -49,7 +50,7 @@
       <Sidebar.MenuItem>
         <Sidebar.MenuButton size="lg" isActive={currentPath === "/"}>
           {#snippet child({ props })}
-            <a href="/" {...props}>
+            <a href={resolve("/")} {...props}>
               <div
                 class="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg"
               >

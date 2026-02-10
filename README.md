@@ -48,6 +48,16 @@ task frontend:dev
 task --list
 ```
 
+常用检查/构建命令：
+
+```bash
+task build
+task build:release
+task lint
+task test
+task check
+```
+
 ## 验证规范是否生效
 
 - `GET /api/v1/health`：健康检查

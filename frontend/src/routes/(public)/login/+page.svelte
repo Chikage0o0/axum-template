@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
   import { toast } from "svelte-sonner";
   import { createSessionHandler } from "$lib/api/generated/client";
   import { CreateSessionRequest } from "$lib/api/generated/schemas";
@@ -48,7 +49,7 @@
     try {
       const res = await createSessionHandler({ username: u, password: p });
       auth.login(res.token);
-      await goto("/settings");
+      await goto(resolve("/settings"));
     } catch (e) {
       if (e instanceof ApiError) {
         fieldErrors = mergeFieldErrors(fieldErrors, detailsToFieldErrors(e.body?.details));

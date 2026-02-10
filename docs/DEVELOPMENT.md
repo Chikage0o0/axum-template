@@ -48,9 +48,13 @@ task frontend:check:api-usage
 ## 5. 提交前检查
 
 ```bash
-task dev:fmt:check
-cargo clippy --all-targets --all-features -- -D warnings
-task frontend:check
+task check
+```
+
+如需包含 OpenAPI/前端生成物一致性检查：
+
+```bash
+task check:full
 ```
 
 ## 6. go-task 命令中心

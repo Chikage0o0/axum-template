@@ -1,6 +1,7 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
   import { page } from "$app/state";
   import CompassIcon from "@lucide/svelte/icons/compass";
   import CornerLeftUpIcon from "@lucide/svelte/icons/corner-left-up";
@@ -15,7 +16,7 @@
   import * as Empty from "$lib/shadcn/components/ui/empty/index.js";
   import { composeDocumentTitle } from "$lib/shared/utils/page-title";
 
-  let { status } = $props<{ status: number }>();
+  let status = $derived(page.status);
 
   let isNotFound = $derived(status === 404);
   let requestedPath = $derived(page.url.pathname);
@@ -63,7 +64,7 @@
       return;
     }
 
-    await goto(recommendedHref);
+    await goto(resolve(recommendedHref));
   }
 </script>
 
@@ -108,7 +109,7 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
-              <Button href={recommendedHref}>
+              <Button href={resolve(recommendedHref)}>
                 <CompassIcon class="size-4" />
                 继续浏览
               </Button>
@@ -122,9 +123,9 @@
           <aside class="bg-background/70 rounded-2xl border p-4 sm:p-5">
             <p class="text-muted-foreground mb-3 text-xs tracking-[0.18em]">常用入口</p>
             <div class="space-y-2">
-              {#each quickLinks as item}
+              {#each quickLinks as item (item.href)}
                 <a
-                  href={item.href}
+                  href={resolve(item.href)}
                   class="hover:bg-muted/70 focus-visible:ring-ring flex items-start gap-3 rounded-xl border px-3 py-2.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
                 >
                   <item.icon class="mt-0.5 size-4 shrink-0" />
@@ -158,7 +159,7 @@
 
         <Empty.Content>
           <div class="flex flex-wrap items-center justify-center gap-2">
-            <Button href={recommendedHref}>返回可用页面</Button>
+            <Button href={resolve(recommendedHref)}>返回可用页面</Button>
             <Button variant="outline" type="button" onclick={goBackOrFallback}>返回上一页</Button>
           </div>
         </Empty.Content>

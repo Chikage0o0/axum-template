@@ -1,6 +1,9 @@
 <script lang="ts">
+  import { resolve } from "$app/paths";
   import type { Component } from "svelte";
   import * as Sidebar from "$lib/shadcn/components/ui/sidebar/index.js";
+
+  type InternalRoute = Parameters<typeof resolve>[0];
 
   let {
     items,
@@ -8,7 +11,7 @@
   }: {
     items: {
       title: string;
-      url: string;
+      url: InternalRoute;
       icon: Component;
       isActive?: boolean;
     }[];
@@ -32,7 +35,7 @@
           isActive={mainItem.isActive || itemActive(mainItem.url)}
         >
           {#snippet child({ props })}
-            <a href={mainItem.url} {...props}>
+            <a href={resolve(mainItem.url)} {...props}>
               <mainItem.icon />
               <span>{mainItem.title}</span>
             </a>

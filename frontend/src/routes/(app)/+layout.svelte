@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
   import { page } from "$app/state";
   import MonitorIcon from "@lucide/svelte/icons/monitor";
   import MoonIcon from "@lucide/svelte/icons/moon";
@@ -58,7 +59,7 @@
       } catch {
         if (cancelled) return;
         auth.logout({ reason: "manual" });
-        await goto("/login");
+        await goto(resolve("/login"));
       } finally {
         ensuringSession = false;
       }
@@ -104,7 +105,7 @@
       // 忽略服务端退出失败，始终清理本地状态。
     }
     auth.logout({ reason: "manual" });
-    await goto("/login");
+    await goto(resolve("/login"));
   }
 
   function setThemeMode(nextMode: ThemeMode) {
@@ -123,7 +124,7 @@
           <Breadcrumb.Root>
             <Breadcrumb.List>
               <Breadcrumb.Item class="hidden md:block">
-                <Breadcrumb.Link href="/">{breadcrumb.section}</Breadcrumb.Link>
+                <Breadcrumb.Link href={resolve("/")}>{breadcrumb.section}</Breadcrumb.Link>
               </Breadcrumb.Item>
               <Breadcrumb.Separator class="hidden md:block" />
               <Breadcrumb.Item>

@@ -16,10 +16,77 @@ tasks:
     cmds:
       - bacon --headless backend-dev-migrate
 
-  check:
+  dev:check:
     desc: 运行 bacon 默认检查
     cmds:
       - bacon
+
+  build:
+    desc: 构建前后端产物（debug）
+    cmds:
+      - task backend:build
+      - task frontend:build
+
+  build:release:
+    desc: 构建后端 release 产物（包含前端嵌入）
+    cmds:
+      - task backend:build:release
+
+  release:
+    desc: release 构建别名
+    cmds:
+      - task build:release
+
+  test:
+    desc: 运行前后端测试
+    cmds:
+      - task backend:test
+      - task frontend:test
+
+  lint:
+    desc: 运行前后端 lint
+    cmds:
+      - task backend:lint
+      - task frontend:lint
+
+  check:
+    desc: 运行前后端 check（格式、lint、测试）
+    cmds:
+      - task backend:check
+      - task frontend:check:all
+
+  check:full:
+    desc: 运行完整检查（含 OpenAPI 一致性）
+    cmds:
+      - task check
+      - task openapi:check
+
+  backend:build:
+    desc: 构建后端 debug 产物
+    cmds:
+      - cargo build
+
+  backend:build:release:
+    desc: 构建后端 release 产物
+    cmds:
+      - cargo build --release
+
+  backend:test:
+    desc: 运行后端测试
+    cmds:
+      - cargo test
+
+  backend:lint:
+    desc: 运行后端 lint（clippy）
+    cmds:
+      - cargo clippy --all-targets --all-features -- -D warnings
+
+  backend:check:
+    desc: 运行后端检查（格式、lint、测试）
+    cmds:
+      - cargo fmt -- --check
+      - task backend:lint
+      - task backend:test
 
   dev:fmt:
     desc: 格式化前后端代码
@@ -93,6 +160,31 @@ tasks:
       - frontend:install
     cmds:
       - ./node_modules/.bin/svelte-kit sync && ./node_modules/.bin/svelte-check --tsconfig ./tsconfig.json
+
+  frontend:lint:
+    desc: 运行前端 lint（ESLint）
+    dir: frontend
+    deps:
+      - frontend:install
+    cmds:
+      - ./node_modules/.bin/eslint . --max-warnings=0
+
+  frontend:test:
+    desc: 运行前端测试
+    dir: frontend
+    deps:
+      - frontend:install
+    cmds:
+      - bun test
+
+  frontend:check:all:
+    desc: 运行前端检查（格式、lint、类型、接口约束、测试）
+    cmds:
+      - task frontend:format:check
+      - task frontend:lint
+      - task frontend:check
+      - task frontend:check:api-usage
+      - task frontend:test
 
   frontend:gen:client:
     desc: 生成前端 API 客户端
