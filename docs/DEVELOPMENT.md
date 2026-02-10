@@ -57,6 +57,18 @@ task check
 task check:full
 ```
 
+使用 `pre-commit`（https://pre-commit.com）时，先安装 hook：
+
+```bash
+task pre-commit:install
+```
+
+手动全量执行一次：
+
+```bash
+task pre-commit:run
+```
+
 ## 6. go-task 命令中心
 
 统一脚本入口位于仓库根目录 `Taskfile.yml`，可通过以下命令查看全部任务：

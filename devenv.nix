@@ -24,7 +24,7 @@ in
     pkgs.pkg-config
     pkgs.openssl
     pkgs.sqlx-cli
-    pkgs.cargo-edit
+    pkgs.pre-commit
     pkgs.bacon
     pkgs.taplo
     pkgs.pgcli

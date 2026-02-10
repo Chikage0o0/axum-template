@@ -1,0 +1,30 @@
+repos:
+  - repo: local
+    hooks:
+      - id: fmt-check
+        name: fmt-check
+        entry: task dev:fmt:check
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: lint
+        name: lint
+        entry: task lint
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: openapi-sync-check
+        name: openapi-sync-check
+        entry: task openapi:check:sync
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: sqlx-offline-check
+        name: sqlx-offline-check
+        entry: task backend:sqlx:check
+        language: system
+        pass_filenames: false
+        always_run: true

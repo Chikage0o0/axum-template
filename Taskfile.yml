@@ -16,11 +16,6 @@ tasks:
     cmds:
       - bacon --headless backend-dev-migrate
 
-  dev:check:
-    desc: 运行 bacon 默认检查
-    cmds:
-      - bacon
-
   build:
     desc: 构建前后端产物（debug）
     cmds:
@@ -88,6 +83,11 @@ tasks:
       - task backend:lint
       - task backend:test
 
+  backend:sqlx:check:
+    desc: 校验 sqlx 离线缓存是否最新
+    cmds:
+      - cargo sqlx prepare --check
+
   dev:fmt:
     desc: 格式化前后端代码
     cmds:
@@ -116,10 +116,23 @@ tasks:
       - task frontend:check:api-usage
       - git diff --exit-code
 
-  pre:git:check:
-    desc: 执行提交前检查
+  openapi:check:sync:
+    desc: 校验 OpenAPI 与前端生成产物是否同步
     cmds:
-      - bash pre-commit-check.sh
+      - cargo run --quiet -- --export-openapi > docs/openapi.json
+      - task frontend:gen:api
+      - task frontend:check:api-usage
+      - git diff --exit-code -- docs/openapi.json frontend/src/lib/api/generated
+
+  pre-commit:install:
+    desc: 安装 pre-commit git hook
+    cmds:
+      - pre-commit install --hook-type pre-commit
+
+  pre-commit:run:
+    desc: 手动执行 pre-commit 全量检查
+    cmds:
+      - pre-commit run --all-files
 
   frontend:dev:
     desc: 启动前端开发服务
