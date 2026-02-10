@@ -15,9 +15,6 @@ in
 
   env.DATABASE_URL = lib.mkDefault "postgres://${dbUser}:${dbPass}@localhost/${dbName}?host=${config.env.PGHOST}";
   env.OPENSSL_DIR = "${pkgs.openssl.dev}";
-  env.PGUSER = dbUser;
-  env.PGPASSWORD = dbPass;
-  env.PGDATABASE = dbName;
   env.OPENSSL_NO_VENDOR = "1";
 
   packages = [
@@ -62,9 +59,7 @@ in
         pass = dbPass;
       }
     ];
-    listen_addresses = "";
   };
-
 
   enterShell = ''
     if [ -f .env ]; then
