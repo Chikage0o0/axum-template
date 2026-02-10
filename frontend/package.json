@@ -4,19 +4,7 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
-    "build": "vite build",
-    "preview": "vite preview",
-    "prepare": "svelte-kit sync || echo ''",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "gen:client": "orval --config orval.config.ts",
-    "gen:schemas": "openapi-zod-client ../docs/openapi.json -o src/lib/api/generated/schemas.ts --export-schemas --template scripts/openapi-zod-schemas.hbs",
-    "gen:api": "bun run gen:client && bun run gen:schemas",
-    "gen:openapi": "bun run gen:api",
-    "gen:openapi:zod": "bun run gen:schemas",
-    "check:api-usage": "if rg -n \"apiFetchJson\\(|fetch\\(\" src --glob '!src/lib/api/generated/**' --glob '!src/lib/api/mutator.ts'; then echo '发现未授权的手写接口调用'; exit 1; fi",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "prepare": "svelte-kit sync || echo ''"
   },
   "devDependencies": {
     "@internationalized/date": "^3.10.0",

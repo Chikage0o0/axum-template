@@ -1,0 +1,166 @@
+version: "3"
+
+tasks:
+  db:migrate:
+    desc: 执行数据库迁移
+    cmds:
+      - sqlx migrate run
+
+  backend:dev:
+    desc: 启动后端开发循环（bacon）
+    cmds:
+      - bacon --headless backend-dev
+
+  backend:dev:migrate:
+    desc: 启动后端开发循环并执行迁移
+    cmds:
+      - bacon --headless backend-dev-migrate
+
+  check:
+    desc: 运行 bacon 默认检查
+    cmds:
+      - bacon
+
+  dev:fmt:
+    desc: 格式化前后端代码
+    cmds:
+      - cargo fmt
+      - taplo fmt
+      - task frontend:format
+
+  dev:fmt:check:
+    desc: 校验前后端格式化状态
+    cmds:
+      - cargo fmt -- --check
+      - taplo fmt --check
+      - task frontend:format:check
+
+  openapi:gen:
+    desc: 生成 OpenAPI 与前端客户端代码
+    cmds:
+      - cargo run --quiet -- --export-openapi > docs/openapi.json
+      - task frontend:gen:api
+
+  openapi:check:
+    desc: 校验 OpenAPI 与客户端代码是否最新
+    cmds:
+      - cargo run --quiet -- --export-openapi > docs/openapi.json
+      - task frontend:gen:api
+      - task frontend:check:api-usage
+      - git diff --exit-code
+
+  pre:git:check:
+    desc: 执行提交前检查
+    cmds:
+      - bash pre-commit-check.sh
+
+  frontend:dev:
+    desc: 启动前端开发服务
+    dir: frontend
+    deps:
+      - frontend:install
+    cmds:
+      - ./node_modules/.bin/vite dev
+
+  frontend:install:
+    desc: 安装前端依赖
+    dir: frontend
+    status:
+      - test -d node_modules
+    cmds:
+      - bun install
+
+  frontend:build:
+    desc: 构建前端产物
+    dir: frontend
+    deps:
+      - frontend:install
+    cmds:
+      - ./node_modules/.bin/vite build
+
+  frontend:preview:
+    desc: 预览前端构建结果
+    dir: frontend
+    deps:
+      - frontend:install
+    cmds:
+      - ./node_modules/.bin/vite preview
+
+  frontend:check:
+    desc: 运行前端类型检查
+    dir: frontend
+    deps:
+      - frontend:install
+    cmds:
+      - ./node_modules/.bin/svelte-kit sync && ./node_modules/.bin/svelte-check --tsconfig ./tsconfig.json
+
+  frontend:gen:client:
+    desc: 生成前端 API 客户端
+    dir: frontend
+    deps:
+      - frontend:install
+    cmds:
+      - ./node_modules/.bin/orval --config orval.config.ts
+
+  frontend:gen:schemas:
+    desc: 生成前端 API Schema
+    dir: frontend
+    deps:
+      - frontend:install
+    cmds:
+      - ./node_modules/.bin/openapi-zod-client ../docs/openapi.json -o src/lib/api/generated/schemas.ts --export-schemas --template scripts/openapi-zod-schemas.hbs
+
+  frontend:gen:api:
+    desc: 生成前端 API 客户端与 Schema
+    dir: frontend
+    cmds:
+      - task frontend:gen:client
+      - task frontend:gen:schemas
+
+  frontend:check:api-usage:
+    desc: 检查未授权手写接口调用
+    dir: frontend
+    deps:
+      - frontend:install
+    cmds:
+      - |
+        set +e
+        rg -n "apiFetchJson\(|fetch\(" src --glob '!src/lib/api/generated/**' --glob '!src/lib/api/mutator.ts'
+        status=$?
+        set -e
+
+        if [ "$status" -eq 0 ]; then
+          echo '发现未授权的手写接口调用'
+          exit 1
+        fi
+
+        if [ "$status" -ne 1 ]; then
+          echo "接口调用扫描失败（rg 退出码: $status）"
+          exit "$status"
+        fi
+
+  frontend:format:
+    desc: 格式化前端文件
+    dir: frontend
+    deps:
+      - frontend:install
+    cmds:
+      - ./node_modules/.bin/prettier --write .
+
+  frontend:format:check:
+    desc: 校验前端格式化状态
+    dir: frontend
+    deps:
+      - frontend:install
+    cmds:
+      - ./node_modules/.bin/prettier --check .
+
+  process:up:
+    desc: 后台启动 devenv 进程组
+    cmds:
+      - devenv processes up --detach
+
+  process:down:
+    desc: 停止 devenv 进程组
+    cmds:
+      - devenv processes down

@@ -6,15 +6,13 @@
 cp .env.example .env
 devenv shell
 devenv up
-cargo run
+task backend:dev
 ```
 
 ## 2. 前端开发
 
 ```bash
-cd frontend
-bun install
-bun run dev
+task frontend:dev
 ```
 
 ## 3. 单体运行（release）
@@ -30,14 +28,13 @@ cargo run --release
 后端导出：
 
 ```bash
-cargo run -- --export-openapi > docs/openapi.json
+task openapi:gen
 ```
 
 前端生成：
 
 ```bash
-cd frontend
-bun run gen:api
+task frontend:gen:api
 ```
 
 说明：`gen:api` 会同时生成 API 调用函数与 Zod schemas，前端提交前校验统一复用该 schemas。
@@ -45,14 +42,21 @@ bun run gen:api
 接口调用约束检查：
 
 ```bash
-cd frontend
-bun run check:api-usage
+task frontend:check:api-usage
 ```
 
 ## 5. 提交前检查
 
 ```bash
-cargo fmt -- --check
+task dev:fmt:check
 cargo clippy --all-targets --all-features -- -D warnings
-cd frontend && bun run check
+task frontend:check
+```
+
+## 6. go-task 命令中心
+
+统一脚本入口位于仓库根目录 `Taskfile.yml`，可通过以下命令查看全部任务：
+
+```bash
+task --list
 ```

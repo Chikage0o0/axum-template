@@ -26,8 +26,7 @@ devenv up
 3) 安装前端依赖（仅首次 / 依赖变更后）
 
 ```bash
-cd frontend
-bun install
+task frontend:install
 ```
 
 4) 单体运行（release 构建时内嵌前端）
@@ -36,7 +35,18 @@ bun install
 cargo run --release
 ```
 
-开发模式不做前端构建与嵌入；本地联调请使用 `cargo run` + `cd frontend && bun run dev`。
+开发模式不做前端构建与嵌入；本地联调建议使用 go-task 统一命令入口：
+
+```bash
+task backend:dev
+task frontend:dev
+```
+
+常用任务可通过以下命令查看：
+
+```bash
+task --list
+```
 
 ## 验证规范是否生效
 

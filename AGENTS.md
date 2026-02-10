@@ -14,23 +14,24 @@
 后端（在项目根目录）：
 
 - 构建：`cargo build`
-- 运行：`cargo run`
+- 运行：`task backend:dev`（开发） / `cargo run --release`（单体 release）
 - 测试：`cargo test`
-- 格式化：`cargo fmt` / `cargo fmt -- --check`
+- 格式化：`task dev:fmt` / `task dev:fmt:check`
 - Lint：`cargo clippy --all-targets --all-features -- -D warnings`
 
 前端（在 `frontend/`）：
 
 - 安装依赖：`bun install`
-- 开发：`bun run dev`
-- 类型检查：`bun run check`
-- 构建：`bun run build`
+- 开发：`task frontend:dev`
+- 类型检查：`task frontend:check`
+- 构建：`task frontend:build`
+- OpenAPI 代码生成：`task frontend:gen:api`
 
 环境（在项目根目录）：
 
 - 进入环境：`devenv shell`
-- 启动服务：`devenv up`
-- 迁移：`db-migrate`
+- 启动服务：`task process:up`
+- 迁移：`task db:migrate`
 
 ## 3. 必须遵守的工程约定
 

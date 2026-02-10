@@ -28,6 +28,7 @@ in
     pkgs.bacon
     pkgs.taplo
     pkgs.pgcli
+    pkgs.go-task
   ];
 
   languages.javascript = {
@@ -64,34 +65,6 @@ in
     listen_addresses = "";
   };
 
-  scripts.db-migrate.exec = "sqlx migrate run";
-  scripts.backend-dev.exec = "bacon --headless backend-dev";
-  scripts.backend-dev-migrate.exec = "bacon --headless backend-dev-migrate";
-  scripts.check.exec = "bacon";
-  scripts.dev-fmt.exec = ''
-    set -euo pipefail
-    echo "[fmt] cargo fmt"
-    cargo fmt
-    echo "[fmt] taplo fmt"
-    taplo fmt
-    echo "[fmt] frontend prettier"
-    bun run --cwd frontend format
-  '';
-  scripts.dev-fmt-check.exec = ''
-    set -euo pipefail
-    echo "[fmt-check] cargo fmt --check"
-    cargo fmt -- --check
-    echo "[fmt-check] taplo fmt --check"
-    taplo fmt --check
-    echo "[fmt-check] frontend prettier --check"
-    bun run --cwd frontend format:check
-  '';
-  scripts.openapi-gen.exec = "cargo run --quiet -- --export-openapi > docs/openapi.json && (cd frontend && bun run gen:api)";
-  scripts.openapi-check.exec = "cargo run --quiet -- --export-openapi > docs/openapi.json && (cd frontend && bun run gen:api && bun run check:api-usage) && git diff --exit-code";
-  scripts.pre-git-check.exec = "bash pre-commit-check.sh";
-  scripts.frontend-dev.exec = "cd frontend && bun run dev";
-  scripts.process-up.exec = "devenv processes up --detach";
-  scripts.process-down.exec = "devenv processes down";
 
   enterShell = ''
     if [ -f .env ]; then
