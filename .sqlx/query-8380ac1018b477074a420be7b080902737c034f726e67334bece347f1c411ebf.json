@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\nSELECT\n    id,\n    username,\n    display_name,\n    email,\n    phone,\n    avatar_url,\n    is_active,\n    metadata,\n    created_at,\n    updated_at\nFROM users\nORDER BY created_at DESC\n        ",
+  "query": "\nSELECT\n    id,\n    username,\n    display_name,\n    email,\n    phone,\n    avatar_url,\n    is_active,\n    metadata,\n    created_at,\n    updated_at\nFROM users\nWHERE ($1::bool = TRUE OR deleted_at IS NULL)\nORDER BY created_at DESC\n        ",
   "describe": {
     "columns": [
       {
@@ -55,7 +55,9 @@
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Bool"
+      ]
     },
     "nullable": [
       false,
@@ -70,5 +72,5 @@
       false
     ]
   },
-  "hash": "96c74b32395f7b2bbb18cfe1b5bbd07df240e1cd711f71dad01ca81b0ac49aed"
+  "hash": "8380ac1018b477074a420be7b080902737c034f726e67334bece347f1c411ebf"
 }

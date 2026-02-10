@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use axum::extract::{Extension, Path, State};
+use axum::extract::{Extension, Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use chrono::{DateTime, Utc};
@@ -207,6 +207,12 @@ pub struct CreateUserIdentityRequest {
     pub metadata: Option<serde_json::Value>,
 }
 
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct ListUsersQuery {
+    #[serde(default)]
+    pub include_deleted: bool,
+}
+
 #[utoipa::path(
     get,
     path = "/api/v1/users/me",
@@ -231,6 +237,9 @@ pub async fn get_current_user_handler(
     get,
     path = "/api/v1/users",
     tag = "users",
+    params(
+        ("include_deleted" = Option<bool>, Query, description = "是否包含已逻辑删除用户")
+    ),
     responses(
         (status = 200, description = "获取用户列表", body = [UserResponse]),
         (status = 401, description = "未登录或 Token 无效", body = crate::api::openapi::ErrorResponseBody),
@@ -239,9 +248,10 @@ pub async fn get_current_user_handler(
     security(("bearer_auth" = []))
 )]
 pub async fn get_users_handler(
+    Query(query): Query<ListUsersQuery>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<UserResponse>>, AppError> {
-    let users = list_users(&state.db).await?;
+    let users = list_users(&state.db, query.include_deleted).await?;
     Ok(Json(users))
 }
 
@@ -296,6 +306,48 @@ pub async fn patch_user_handler(
     >,
 ) -> Result<Json<UserResponse>, AppError> {
     let user = patch_user(&state.db, user_id, payload).await?;
+    Ok(Json(user))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/v1/users/{user_id}",
+    tag = "users",
+    params(("user_id" = Uuid, Path, description = "用户 ID")),
+    responses(
+        (status = 204, description = "逻辑删除用户"),
+        (status = 401, description = "未登录或 Token 无效", body = crate::api::openapi::ErrorResponseBody),
+        (status = 404, description = "用户不存在", body = crate::api::openapi::ErrorResponseBody),
+        (status = 500, description = "服务器内部错误", body = crate::api::openapi::ErrorResponseBody)
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn delete_user_handler(
+    Path(user_id): Path<Uuid>,
+    State(state): State<AppState>,
+) -> Result<StatusCode, AppError> {
+    soft_delete_user(&state.db, user_id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/users/{user_id}/restore",
+    tag = "users",
+    params(("user_id" = Uuid, Path, description = "用户 ID")),
+    responses(
+        (status = 200, description = "恢复逻辑删除用户", body = UserResponse),
+        (status = 401, description = "未登录或 Token 无效", body = crate::api::openapi::ErrorResponseBody),
+        (status = 404, description = "用户不存在", body = crate::api::openapi::ErrorResponseBody),
+        (status = 500, description = "服务器内部错误", body = crate::api::openapi::ErrorResponseBody)
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn restore_user_handler(
+    Path(user_id): Path<Uuid>,
+    State(state): State<AppState>,
+) -> Result<Json<UserResponse>, AppError> {
+    let user = restore_user(&state.db, user_id).await?;
     Ok(Json(user))
 }
 
@@ -381,7 +433,7 @@ struct UserIdentityRow {
     last_login_at: Option<DateTime<Utc>>,
 }
 
-async fn list_users(db: &DbPool) -> Result<Vec<UserResponse>, AppError> {
+async fn list_users(db: &DbPool, include_deleted: bool) -> Result<Vec<UserResponse>, AppError> {
     let users: Vec<UserRow> = sqlx::query_as!(
         UserRow,
         r#"
@@ -397,8 +449,10 @@ SELECT
     created_at,
     updated_at
 FROM users
+WHERE ($1::bool = TRUE OR deleted_at IS NULL)
 ORDER BY created_at DESC
         "#,
+        include_deleted,
     )
     .fetch_all(db)
     .await
@@ -427,6 +481,77 @@ ORDER BY created_at DESC
             updated_at: row.updated_at,
         })
         .collect())
+}
+
+async fn soft_delete_user(db: &DbPool, user_id: Uuid) -> Result<(), AppError> {
+    let result = sqlx::query!(
+        r#"
+UPDATE users
+SET
+    deleted_at = NOW(),
+    is_active = FALSE,
+    updated_at = NOW()
+WHERE id = $1
+  AND deleted_at IS NULL
+        "#,
+        user_id,
+    )
+    .execute(db)
+    .await
+    .map_err(|e| AppError::InternalError(format!("逻辑删除用户失败: {e}")))?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound(format!("用户不存在或已删除: {user_id}")));
+    }
+
+    Ok(())
+}
+
+async fn restore_user(db: &DbPool, user_id: Uuid) -> Result<UserResponse, AppError> {
+    let row = sqlx::query_as!(
+        UserRow,
+        r#"
+UPDATE users
+SET
+    deleted_at = NULL,
+    is_active = TRUE,
+    updated_at = NOW()
+WHERE id = $1
+  AND deleted_at IS NOT NULL
+RETURNING
+    id,
+    username,
+    display_name,
+    email,
+    phone,
+    avatar_url,
+    is_active,
+    metadata,
+    created_at,
+    updated_at
+        "#,
+        user_id,
+    )
+    .fetch_optional(db)
+    .await
+    .map_err(|e| map_user_db_error("恢复用户失败", e))?
+    .ok_or_else(|| AppError::NotFound(format!("用户不存在或未删除: {user_id}")))?;
+
+    let identities = list_identities_by_user_id(db, user_id).await?;
+
+    Ok(UserResponse {
+        id: row.id,
+        username: row.username,
+        display_name: row.display_name,
+        email: row.email,
+        phone: row.phone,
+        avatar_url: row.avatar_url,
+        is_active: row.is_active,
+        metadata: row.metadata,
+        identities,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+    })
 }
 
 async fn get_user_by_id(db: &DbPool, user_id: Uuid) -> Result<UserResponse, AppError> {

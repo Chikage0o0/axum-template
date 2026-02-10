@@ -55,6 +55,8 @@ impl Modify for SecurityAddon {
         users::get_users_handler,
         users::create_user_handler,
         users::patch_user_handler,
+        users::delete_user_handler,
+        users::restore_user_handler,
         users::create_user_identity_handler,
         users::delete_user_identity_handler
     ),
@@ -91,6 +93,10 @@ mod tests {
         assert!(doc.paths.paths.contains_key("/api/v1/users"));
         assert!(doc.paths.paths.contains_key("/api/v1/users/me"));
         assert!(doc.paths.paths.contains_key("/api/v1/users/{user_id}"));
+        assert!(doc
+            .paths
+            .paths
+            .contains_key("/api/v1/users/{user_id}/restore"));
         assert!(doc
             .paths
             .paths

@@ -19,8 +19,9 @@ use crate::modules::sessions::handlers::{
 };
 use crate::modules::settings::handlers::{get_settings_handler, patch_settings_handler};
 use crate::modules::users::handlers::{
-    create_user_handler, create_user_identity_handler, delete_user_identity_handler,
-    get_current_user_handler, get_users_handler, patch_user_handler,
+    create_user_handler, create_user_identity_handler, delete_user_handler,
+    delete_user_identity_handler, get_current_user_handler, get_users_handler, patch_user_handler,
+    restore_user_handler,
 };
 use crate::web_assets::{serve_frontend_index, serve_frontend_path};
 
@@ -64,7 +65,14 @@ pub fn app_router(state: AppState) -> Router {
             get(get_users_handler).post(create_user_handler),
         )
         .route("/api/v1/users/me", get(get_current_user_handler))
-        .route("/api/v1/users/{user_id}", patch(patch_user_handler))
+        .route(
+            "/api/v1/users/{user_id}",
+            patch(patch_user_handler).delete(delete_user_handler),
+        )
+        .route(
+            "/api/v1/users/{user_id}/restore",
+            post(restore_user_handler),
+        )
         .route(
             "/api/v1/users/{user_id}/identities",
             post(create_user_identity_handler),

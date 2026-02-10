@@ -250,6 +250,13 @@ export interface UserResponse {
   username?: string | null;
 }
 
+export type GetUsersHandlerParams = {
+/**
+ * 是否包含已逻辑删除用户
+ */
+include_deleted?: boolean;
+};
+
 export const getPatchCurrentUserPasswordHandlerUrl = () => {
 
 
@@ -379,17 +386,24 @@ export const patchSettingsHandler = async (patchSettingsRequest: PatchSettingsRe
 
 
 
-export const getGetUsersHandlerUrl = () => {
+export const getGetUsersHandlerUrl = (params?: GetUsersHandlerParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
-  
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/v1/users`
+  return stringifiedParams.length > 0 ? `/api/v1/users?${stringifiedParams}` : `/api/v1/users`
 }
 
-export const getUsersHandler = async ( options?: RequestInit): Promise<UserResponse[]> => {
+export const getUsersHandler = async (params?: GetUsersHandlerParams, options?: RequestInit): Promise<UserResponse[]> => {
   
-  return apiClient<UserResponse[]>(getGetUsersHandlerUrl(),
+  return apiClient<UserResponse[]>(getGetUsersHandlerUrl(params),
   {      
     ...options,
     method: 'GET'
@@ -436,6 +450,27 @@ export const getCurrentUserHandler = async ( options?: RequestInit): Promise<Use
   {      
     ...options,
     method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export const getDeleteUserHandlerUrl = (userId: string,) => {
+
+
+  
+
+  return `/api/v1/users/${userId}`
+}
+
+export const deleteUserHandler = async (userId: string, options?: RequestInit): Promise<void> => {
+  
+  return apiClient<void>(getDeleteUserHandlerUrl(userId),
+  {      
+    ...options,
+    method: 'DELETE'
     
     
   }
@@ -505,6 +540,27 @@ export const deleteUserIdentityHandler = async (userId: string,
   {      
     ...options,
     method: 'DELETE'
+    
+    
+  }
+);}
+
+
+
+export const getRestoreUserHandlerUrl = (userId: string,) => {
+
+
+  
+
+  return `/api/v1/users/${userId}/restore`
+}
+
+export const restoreUserHandler = async (userId: string, options?: RequestInit): Promise<UserResponse> => {
+  
+  return apiClient<UserResponse>(getRestoreUserHandlerUrl(userId),
+  {      
+    ...options,
+    method: 'POST'
     
     
   }
