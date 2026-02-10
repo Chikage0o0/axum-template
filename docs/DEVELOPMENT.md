@@ -76,3 +76,8 @@ task pre-commit:run
 ```bash
 task --list
 ```
+
+## 7. sqlx 查询约束
+
+- 后端业务代码中的 SQL 必须使用 `sqlx` 宏进行编译时校验（如 `query!`、`query_as!`、`query_scalar!`、`query_file!`）。
+- 禁止在业务代码中使用仅运行时校验的 `sqlx::query(...)` / `sqlx::query_as(...)` 形式。

@@ -2,6 +2,11 @@
 
 本模板包含以下核心表：`system_config`、`users`、`user_identities`。
 
+## SQL 开发约束
+
+- 后端业务代码中的 SQL 必须使用 `sqlx` 宏进行编译时校验（如 `query!`、`query_as!`、`query_scalar!`、`query_file!`）。
+- 禁止在业务代码中使用仅运行时校验的 `sqlx::query(...)` / `sqlx::query_as(...)` 形式。
+
 ## 表：system_config
 
 字段：
