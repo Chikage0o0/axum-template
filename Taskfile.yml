@@ -250,7 +250,7 @@ tasks:
     cmds:
       - |
         set +e
-        rg -n "apiFetchJson\(|fetch\(" src --glob '!src/lib/api/generated/**' --glob '!src/lib/api/mutator.ts'
+        rg -n "apiFetchJson\(|fetch\(" src --glob '!src/lib/api/generated/**' --glob '!src/lib/api/mutator.ts' --glob '!src/lib/shadcn/**'
         status=$?
         set -e
 

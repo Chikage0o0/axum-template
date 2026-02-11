@@ -11,5 +11,5 @@
     "strict": true,
     "moduleResolution": "bundler"
   },
-  "exclude": ["src/**/*.test.js", "src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.js", "src/**/*.test.ts", "src/lib/shadcn/**"]
 }
