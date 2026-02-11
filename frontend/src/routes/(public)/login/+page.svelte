@@ -4,9 +4,9 @@
   import { toast } from "svelte-sonner";
   import { createSessionHandler } from "$lib/api/generated/client";
   import { CreateSessionRequest } from "$lib/api/generated/schemas";
+  import { useApiFormSubmit } from "$lib/shared/forms/use-api-form-submit.svelte";
   import { zodErrorToFieldErrors } from "$lib/shared/forms/field-errors";
   import { useFieldErrors } from "$lib/shared/forms/use-field-errors.svelte";
-  import { ApiError } from "$lib/api/mutator";
   import { auth } from "$lib/features/auth/state/auth";
   import PasswordInput from "$lib/shared/components/password-input.svelte";
   import { Button } from "$lib/shadcn/components/ui/button/index.js";
@@ -17,6 +17,7 @@
   let identifier = $state("");
   let password = $state("");
   let submitting = $state(false);
+  const apiSubmit = useApiFormSubmit();
   const fieldErrors = useFieldErrors<"identifier" | "password">();
 
   async function submit() {
@@ -31,22 +32,25 @@
 
     fieldErrors.clearErrors();
 
-    submitting = true;
-    try {
-      const res = await createSessionHandler({ identifier: i, password: p });
-      auth.login(res.token);
-      await goto(resolve("/settings"));
-    } catch (e) {
-      if (e instanceof ApiError) {
-        fieldErrors.mergeApiDetails(e.body?.details);
-        if (fieldErrors.invalid("identifier", "password")) {
-          return;
-        }
-      }
-      toast.error(e instanceof Error ? e.message : "登录失败");
-    } finally {
-      submitting = false;
-    }
+    await apiSubmit.run(
+      async () => {
+        const res = await createSessionHandler({ identifier: i, password: p });
+        auth.login(res.token);
+        await goto(resolve("/settings"));
+      },
+      {
+        setSubmitting(next) {
+          submitting = next;
+        },
+        onFieldErrors(details) {
+          fieldErrors.mergeApiDetails(details);
+          return fieldErrors.invalid("identifier", "password");
+        },
+        onUnknownError(error) {
+          toast.error(error instanceof Error ? error.message : "登录失败");
+        },
+      },
+    );
   }
 </script>
 

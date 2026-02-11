@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { toast } from "svelte-sonner";
-  import { ApiError } from "$lib/api/mutator";
   import {
     getSettingsHandler,
     patchSettingsHandler,
@@ -9,6 +8,7 @@
     type SettingsResponse,
   } from "$lib/api/generated/client";
   import { PatchSettingsRequest as PatchSettingsRequestSchema } from "$lib/api/generated/schemas";
+  import { useApiFormSubmit } from "$lib/shared/forms/use-api-form-submit.svelte";
   import { type FieldErrors, zodErrorToFieldErrors } from "$lib/shared/forms/field-errors";
   import { useFieldErrors } from "$lib/shared/forms/use-field-errors.svelte";
   import PasswordInput from "$lib/shared/components/password-input.svelte";
@@ -27,6 +27,7 @@
   let welcomeMessage = $state("");
   let exampleApiBase = $state("");
   let exampleApiKey = $state("");
+  const apiSubmit = useApiFormSubmit();
   const settingsFieldErrors = useFieldErrors<string>();
 
   async function reload() {
@@ -59,6 +60,7 @@
       toast.error("配置尚未加载");
       return;
     }
+    const currentSettings = settings;
 
     const localErrors: FieldErrors = {};
     const intervalRaw = checkIntervalSecs.trim();
@@ -89,57 +91,61 @@
     }
 
     settingsFieldErrors.clearErrors();
-    saving = true;
-    try {
-      const payload: PatchSettingsRequestDto = {};
-      const app: NonNullable<PatchSettingsRequestDto["app"]> = {};
-      const integrations: NonNullable<PatchSettingsRequestDto["integrations"]> = {};
+    await apiSubmit.run(
+      async () => {
+        const payload: PatchSettingsRequestDto = {};
+        const app: NonNullable<PatchSettingsRequestDto["app"]> = {};
+        const integrations: NonNullable<PatchSettingsRequestDto["integrations"]> = {};
 
-      const interval = Math.trunc(intervalNum);
-      if (interval !== settings.app.check_interval_secs) app.check_interval_secs = interval;
+        const interval = Math.trunc(intervalNum);
+        if (interval !== currentSettings.app.check_interval_secs)
+          app.check_interval_secs = interval;
 
-      if (welcomeMessageTrimmed !== settings.app.welcome_message) {
-        app.welcome_message = welcomeMessageTrimmed;
-      }
+        if (welcomeMessageTrimmed !== currentSettings.app.welcome_message) {
+          app.welcome_message = welcomeMessageTrimmed;
+        }
 
-      if (apiBaseTrimmed !== settings.integrations.example_api_base) {
-        integrations.example_api_base = apiBaseTrimmed;
-      }
+        if (apiBaseTrimmed !== currentSettings.integrations.example_api_base) {
+          integrations.example_api_base = apiBaseTrimmed;
+        }
 
-      if (apiKeyTrimmed) integrations.example_api_key = apiKeyTrimmed;
+        if (apiKeyTrimmed) integrations.example_api_key = apiKeyTrimmed;
 
-      if (Object.keys(app).length) payload.app = app;
-      if (Object.keys(integrations).length) payload.integrations = integrations;
+        if (Object.keys(app).length) payload.app = app;
+        if (Object.keys(integrations).length) payload.integrations = integrations;
 
-      if (!Object.keys(payload).length) {
-        settingsFieldErrors.clearErrors();
-        return;
-      }
-
-      const payloadCheck = PatchSettingsRequestSchema.safeParse(payload);
-      if (!payloadCheck.success) {
-        settingsFieldErrors.setErrors(zodErrorToFieldErrors(payloadCheck.error));
-        return;
-      }
-
-      const updated = await patchSettingsHandler(payload);
-      settings = updated;
-      checkIntervalSecs = String(updated.app.check_interval_secs);
-      welcomeMessage = updated.app.welcome_message;
-      exampleApiBase = updated.integrations.example_api_base;
-      exampleApiKey = "";
-      settingsFieldErrors.clearErrors();
-    } catch (e) {
-      if (e instanceof ApiError) {
-        settingsFieldErrors.mergeApiDetails(e.body?.details);
-        if (Object.keys(settingsFieldErrors.errors).length > 0) {
+        if (!Object.keys(payload).length) {
+          settingsFieldErrors.clearErrors();
           return;
         }
-      }
-      toast.error(e instanceof Error ? e.message : "保存失败");
-    } finally {
-      saving = false;
-    }
+
+        const payloadCheck = PatchSettingsRequestSchema.safeParse(payload);
+        if (!payloadCheck.success) {
+          settingsFieldErrors.setErrors(zodErrorToFieldErrors(payloadCheck.error));
+          return;
+        }
+
+        const updated = await patchSettingsHandler(payload);
+        settings = updated;
+        checkIntervalSecs = String(updated.app.check_interval_secs);
+        welcomeMessage = updated.app.welcome_message;
+        exampleApiBase = updated.integrations.example_api_base;
+        exampleApiKey = "";
+        settingsFieldErrors.clearErrors();
+      },
+      {
+        setSubmitting(next) {
+          saving = next;
+        },
+        onFieldErrors(details) {
+          settingsFieldErrors.mergeApiDetails(details);
+          return Object.keys(settingsFieldErrors.errors).length > 0;
+        },
+        onUnknownError(error) {
+          toast.error(error instanceof Error ? error.message : "保存失败");
+        },
+      },
+    );
   }
 
   onMount(() => {

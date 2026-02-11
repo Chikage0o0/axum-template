@@ -4,7 +4,6 @@
   import LogOutIcon from "@lucide/svelte/icons/log-out";
   import UserPenIcon from "@lucide/svelte/icons/user-pen";
   import { toast } from "svelte-sonner";
-  import { ApiError } from "$lib/api/mutator";
   import {
     getCurrentUserHandler,
     patchCurrentUserPasswordHandler,
@@ -23,6 +22,7 @@
     type FieldErrors,
     zodErrorToFieldErrors,
   } from "$lib/shared/forms/field-errors";
+  import { useApiFormSubmit } from "$lib/shared/forms/use-api-form-submit.svelte";
   import { validatePasswordChangeForm } from "$lib/shared/forms/password-change";
   import { auth } from "$lib/features/auth/state/auth";
   import {
@@ -72,6 +72,7 @@
   let confirmPassword = $state("");
   let changingPassword = $state(false);
   let passwordFieldErrors = $state<FieldErrors>({});
+  const apiSubmit = useApiFormSubmit();
 
   function syncCurrentUserDraft(nextUser: UserResponse) {
     currentUserDraft = {
@@ -135,6 +136,7 @@
       toast.error("当前用户不存在，无法保存");
       return;
     }
+    const userToUpdate = currentUser;
 
     const draftCheck = CreateUserRequestSchema.pick({
       display_name: true,
@@ -152,7 +154,7 @@
       return;
     }
 
-    const result = buildCurrentUserPatchPayload(currentUser, currentUserDraft);
+    const result = buildCurrentUserPatchPayload(userToUpdate, currentUserDraft);
     if (!result.ok) {
       if (result.message.includes("display_name")) {
         profileFieldErrors = { display_name: [result.message] };
@@ -170,32 +172,35 @@
       return;
     }
 
-    savingCurrentUser = true;
-    try {
-      const updated = await patchUserHandler(currentUser.id, result.payload);
-      currentUser = updated;
-      syncCurrentUserDraft(updated);
-      profileFieldErrors = {};
+    await apiSubmit.run(
+      async () => {
+        const updated = await patchUserHandler(userToUpdate.id, result.payload);
+        currentUser = updated;
+        syncCurrentUserDraft(updated);
+        profileFieldErrors = {};
 
-      const mapped = toAuthUser(updated);
-      if (mapped) {
-        auth.syncUser(mapped);
-      }
-
-      toast.success("个人信息已更新");
-      profileDialogOpen = false;
-    } catch (e) {
-      if (e instanceof ApiError) {
-        const mapped = detailsToFieldErrors(e.body?.details);
-        profileFieldErrors = mergeFieldErrors(profileFieldErrors, mapped);
-        if (Object.keys(mapped).length > 0) {
-          return;
+        const mapped = toAuthUser(updated);
+        if (mapped) {
+          auth.syncUser(mapped);
         }
-      }
-      toast.error(e instanceof Error ? e.message : "更新个人信息失败");
-    } finally {
-      savingCurrentUser = false;
-    }
+
+        toast.success("个人信息已更新");
+        profileDialogOpen = false;
+      },
+      {
+        setSubmitting(next) {
+          savingCurrentUser = next;
+        },
+        onFieldErrors(details) {
+          const mapped = detailsToFieldErrors(details);
+          profileFieldErrors = mergeFieldErrors(profileFieldErrors, mapped);
+          return Object.keys(mapped).length > 0;
+        },
+        onUnknownError(error) {
+          toast.error(error instanceof Error ? error.message : "更新个人信息失败");
+        },
+      },
+    );
   }
 
   async function submitPasswordChange() {
@@ -209,25 +214,28 @@
       return;
     }
 
-    changingPassword = true;
-    try {
-      await patchCurrentUserPasswordHandler(payload);
-      toast.success("密码已更新，请重新登录");
-      passwordDialogOpen = false;
-      resetPasswordForm();
-      await onLogout();
-    } catch (e) {
-      if (e instanceof ApiError) {
-        const mapped = detailsToFieldErrors(e.body?.details);
-        passwordFieldErrors = mergeFieldErrors(passwordFieldErrors, mapped);
-        if (Object.keys(mapped).length > 0) {
-          return;
-        }
-      }
-      toast.error(e instanceof Error ? e.message : "修改失败");
-    } finally {
-      changingPassword = false;
-    }
+    await apiSubmit.run(
+      async () => {
+        await patchCurrentUserPasswordHandler(payload);
+        toast.success("密码已更新，请重新登录");
+        passwordDialogOpen = false;
+        resetPasswordForm();
+        await onLogout();
+      },
+      {
+        setSubmitting(next) {
+          changingPassword = next;
+        },
+        onFieldErrors(details) {
+          const mapped = detailsToFieldErrors(details);
+          passwordFieldErrors = mergeFieldErrors(passwordFieldErrors, mapped);
+          return Object.keys(mapped).length > 0;
+        },
+        onUnknownError(error) {
+          toast.error(error instanceof Error ? error.message : "修改失败");
+        },
+      },
+    );
   }
 </script>
 
