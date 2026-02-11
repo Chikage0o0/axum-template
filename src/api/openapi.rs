@@ -52,6 +52,7 @@ impl Modify for SecurityAddon {
         settings::patch_settings_handler,
         security_handlers::patch_current_user_password_handler,
         users::get_current_user_handler,
+        users::patch_current_user_handler,
         users::get_users_handler,
         users::create_user_handler,
         users::patch_user_handler,
@@ -71,6 +72,7 @@ impl Modify for SecurityAddon {
         security_handlers::PatchCurrentUserPasswordRequest,
         users::UserResponse,
         users::CreateUserRequest,
+        users::PatchCurrentUserRequest,
         users::PatchUserRequest
     ))
 )]

@@ -106,12 +106,20 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let status = self.status_code();
         let code = self.error_code();
-        let message = self.to_string();
+        let raw_message = self.to_string();
+        let message = match &self {
+            AppError::InternalError(_) | AppError::Unknown(_) => "服务器内部错误".to_string(),
+            _ => raw_message.clone(),
+        };
         let details = match &self {
             AppError::ValidationError { details, .. } => details.clone(),
             _ => None,
         };
         let request_id = current_request_id().unwrap_or_else(|| "req_unknown".to_string());
+
+        if matches!(self, AppError::InternalError(_) | AppError::Unknown(_)) {
+            tracing::error!(%request_id, code, status = %status, error = %raw_message, "internal app error");
+        }
 
         let body = Json(ErrorResponse {
             code,

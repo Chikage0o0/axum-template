@@ -1,12 +1,22 @@
-use axum::extract::State;
+use axum::extract::{Extension, State};
 use axum::Json;
 use garde::Validate;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::api::auth::CurrentUser;
 use crate::error::AppError;
 use crate::http::router::AppState;
 use crate::services::system_config;
+
+fn ensure_admin(current_user: &CurrentUser) -> Result<(), AppError> {
+    if current_user.role != "admin" {
+        return Err(AppError::PermissionDenied(
+            "仅管理员可执行该操作".to_string(),
+        ));
+    }
+    Ok(())
+}
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct SettingsResponse {
@@ -109,16 +119,19 @@ pub struct PatchIntegrationsSettings {
         (status = 200, description = "更新并返回运行期配置", body = SettingsResponse),
         (status = 400, description = "请求参数错误", body = crate::api::openapi::ErrorResponseBody),
         (status = 401, description = "未登录或 Token 无效", body = crate::api::openapi::ErrorResponseBody),
+        (status = 403, description = "权限不足（仅管理员可写）", body = crate::api::openapi::ErrorResponseBody),
         (status = 500, description = "服务器内部错误", body = crate::api::openapi::ErrorResponseBody)
     ),
     security(("bearer_auth" = []))
 )]
 pub async fn patch_settings_handler(
+    Extension(current_user): Extension<CurrentUser>,
     State(state): State<AppState>,
     crate::api::validation::ValidatedJson(payload): crate::api::validation::ValidatedJson<
         PatchSettingsRequest,
     >,
 ) -> Result<Json<SettingsResponse>, AppError> {
+    ensure_admin(&current_user)?;
     let mut changes: Vec<(String, serde_json::Value)> = Vec::new();
 
     if let Some(app) = payload.app {

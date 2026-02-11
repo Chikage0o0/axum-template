@@ -7,13 +7,13 @@
   import { ApiError } from "$lib/api/mutator";
   import {
     getCurrentUserHandler,
+    patchCurrentUserHandler,
     patchCurrentUserPasswordHandler,
-    patchUserHandler,
     type UserResponse,
   } from "$lib/api/generated/client";
   import {
     CreateUserRequest as CreateUserRequestSchema,
-    PatchUserRequest as PatchUserRequestSchema,
+    PatchCurrentUserRequest as PatchCurrentUserRequestSchema,
   } from "$lib/api/generated/schemas";
   import {
     detailsToFieldErrors,
@@ -164,7 +164,7 @@
       return;
     }
 
-    const payloadCheck = PatchUserRequestSchema.safeParse(result.payload);
+    const payloadCheck = PatchCurrentUserRequestSchema.safeParse(result.payload);
     if (!payloadCheck.success) {
       profileFieldErrors = zodErrorToFieldErrors(payloadCheck.error);
       return;
@@ -172,7 +172,7 @@
 
     savingCurrentUser = true;
     try {
-      const updated = await patchUserHandler(currentUser.id, result.payload);
+      const updated = await patchCurrentUserHandler(result.payload);
       currentUser = updated;
       syncCurrentUserDraft(updated);
       profileFieldErrors = {};

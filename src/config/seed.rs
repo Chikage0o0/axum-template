@@ -208,13 +208,15 @@ INSERT INTO users (
     username,
     display_name,
     email,
+    role,
     is_active,
     metadata,
     password_hash
 )
-VALUES ($1, $2, $3, TRUE, '{}'::jsonb, $4)
+VALUES ($1, $2, $3, 'admin', TRUE, '{}'::jsonb, $4)
 ON CONFLICT (username) WHERE deleted_at IS NULL AND username IS NOT NULL DO UPDATE
 SET password_hash = COALESCE(NULLIF(users.password_hash, ''), EXCLUDED.password_hash),
+    role = 'admin',
     is_active = TRUE,
     updated_at = NOW()
         "#,

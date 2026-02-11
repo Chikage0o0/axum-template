@@ -1,4 +1,8 @@
-import type { PatchUserRequest, UserResponse } from "$lib/api/generated/client";
+import type {
+  PatchCurrentUserRequest,
+  PatchUserRequest,
+  UserResponse,
+} from "$lib/api/generated/client";
 import type { AuthUser } from "$lib/features/auth/model/auth-user";
 
 export type User = UserResponse;
@@ -70,8 +74,8 @@ export function buildPatchUserPayload(
 export function buildCurrentUserPatchPayload(
   current: CurrentUserEditable,
   draft: CurrentUserDraft,
-): { ok: true; payload: PatchUserRequest } | { ok: false; message: string } {
-  const payload: PatchUserRequest = {};
+): { ok: true; payload: PatchCurrentUserRequest } | { ok: false; message: string } {
+  const payload: PatchCurrentUserRequest = {};
 
   const displayName = draft.display_name.trim();
   const email = draft.email.trim();

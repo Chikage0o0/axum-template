@@ -77,6 +77,14 @@ export const CreateUserRequest = z
     username: z.union([z.string(), z.null()]).optional(),
   })
   .passthrough();
+export const PatchCurrentUserRequest = z
+  .object({
+    avatar_url: z.union([z.string(), z.null()]),
+    display_name: z.union([z.string(), z.null()]),
+    email: z.union([z.string(), z.null()]),
+    phone: z.union([z.string(), z.null()]),
+  })
+  .partial();
 export const PatchUserRequest = z
   .object({
     avatar_url: z.union([z.string(), z.null()]),

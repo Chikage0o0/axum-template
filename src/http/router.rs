@@ -20,7 +20,7 @@ use crate::modules::sessions::handlers::{
 use crate::modules::settings::handlers::{get_settings_handler, patch_settings_handler};
 use crate::modules::users::handlers::{
     create_user_handler, delete_user_handler, get_current_user_handler, get_users_handler,
-    patch_user_handler, restore_user_handler,
+    patch_current_user_handler, patch_user_handler, restore_user_handler,
 };
 use crate::web_assets::{serve_frontend_index, serve_frontend_path};
 
@@ -63,7 +63,10 @@ pub fn app_router(state: AppState) -> Router {
             "/api/v1/users",
             get(get_users_handler).post(create_user_handler),
         )
-        .route("/api/v1/users/me", get(get_current_user_handler))
+        .route(
+            "/api/v1/users/me",
+            get(get_current_user_handler).patch(patch_current_user_handler),
+        )
         .route(
             "/api/v1/users/{user_id}",
             patch(patch_user_handler).delete(delete_user_handler),
@@ -199,17 +202,19 @@ INSERT INTO users (
     username,
     display_name,
     email,
+    role,
     is_active,
     metadata,
     password_hash,
     auth_version,
     deleted_at
 )
-VALUES ('admin', 'admin-display', 'admin@local.invalid', TRUE, '{}'::jsonb, $1, 0, NULL)
+VALUES ('admin', 'admin-display', 'admin@local.invalid', 'admin', TRUE, '{}'::jsonb, $1, 0, NULL)
 ON CONFLICT (username) WHERE deleted_at IS NULL AND username IS NOT NULL
 DO UPDATE SET
     display_name = EXCLUDED.display_name,
     email = EXCLUDED.email,
+    role = 'admin',
     is_active = TRUE,
     password_hash = EXCLUDED.password_hash,
     auth_version = 0,

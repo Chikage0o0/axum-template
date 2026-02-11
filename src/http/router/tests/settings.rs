@@ -64,3 +64,34 @@ async fn get_settings_should_require_auth_and_return_runtime_config(pool: sqlx::
 
     cleanup_test_users(&pool, &[user_id]).await;
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn non_admin_should_be_forbidden_to_patch_settings(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let username = format!("settings_patch_user_{}", Uuid::new_v4().simple());
+    let email = format!("{username}@example.invalid");
+    let password = "SettingsPatchPassword#A123";
+    let user_id = create_or_update_user_with_password(&pool, &username, &email, password).await;
+
+    let (token, _) = login_and_get_tokens(&server, &username, password).await;
+    let response = request_json(
+        &server,
+        Method::PATCH,
+        "/api/v1/settings",
+        Some(&token),
+        None,
+        Some(serde_json::json!({
+            "app": {
+                "welcome_message": "forbidden-update",
+            }
+        })),
+    )
+    .await;
+
+    assert_eq!(response.status_code(), StatusCode::FORBIDDEN);
+    let body = response.json::<Value>();
+    assert_eq!(body.get("code").and_then(Value::as_u64), Some(2002));
+
+    cleanup_test_users(&pool, &[user_id]).await;
+}

@@ -90,6 +90,10 @@ LIMIT 1
     .map_err(|e| AppError::InternalError(format!("查询鉴权状态失败: {e}")))?
     .ok_or_else(|| AppError::auth_token("Token 无效或已过期"))?;
 
+    if token_data.claims.role != "admin" && token_data.claims.role != "user" {
+        return Err(AppError::auth_token("Token 无效或已过期"));
+    }
+
     if auth_row.auth_version != token_data.claims.ver {
         return Err(AppError::auth_token("Token 无效或已过期"));
     }
