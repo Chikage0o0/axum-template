@@ -134,11 +134,10 @@ fn should_expose_openapi() -> bool {
 mod tests {
     use super::*;
 
-    use axum::body::{to_bytes, Body};
-    use axum::http::{header, Method, Request, StatusCode};
-    use serde_json::{json, Value};
+    use axum::http::{header, Method, StatusCode};
+    use axum_test::{TestResponse, TestServer};
+    use serde_json::Value;
     use sqlx::postgres::PgPoolOptions;
-    use tower::ServiceExt;
     use uuid::Uuid;
 
     fn database_url_for_e2e() -> Option<String> {
@@ -148,49 +147,31 @@ mod tests {
             .filter(|v| !v.is_empty())
     }
 
+    const E2E_JWT_SECRET: &str = "router-tests-shared-jwt-secret";
+
     async fn request_json(
-        app: &Router,
+        server: &TestServer,
         method: Method,
         uri: &str,
         token: Option<&str>,
         cookie: Option<&str>,
         body: Option<Value>,
-    ) -> axum::response::Response {
-        let mut builder = Request::builder().method(method).uri(uri);
-        builder = builder.header(header::ACCEPT, "application/json");
+    ) -> TestResponse {
+        let mut request = server
+            .method(method, uri)
+            .add_header(header::ACCEPT, "application/json");
         if let Some(token) = token {
-            builder = builder.header(header::AUTHORIZATION, format!("Bearer {token}"));
+            request = request.authorization_bearer(token);
         }
         if let Some(cookie) = cookie {
-            builder = builder.header(header::COOKIE, cookie);
+            request = request.add_header(header::COOKIE, cookie);
         }
 
-        let request = if let Some(body) = body {
-            builder
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(body.to_string()))
-                .expect("构造请求失败")
-        } else {
-            builder.body(Body::empty()).expect("构造请求失败")
-        };
+        if let Some(body) = body {
+            request = request.json(&body);
+        }
 
-        app.clone().oneshot(request).await.expect("执行请求失败")
-    }
-
-    async fn response_json(response: axum::response::Response) -> Value {
-        let bytes = to_bytes(response.into_body(), usize::MAX)
-            .await
-            .expect("读取响应体失败");
-        serde_json::from_slice::<Value>(&bytes).expect("响应体应为 JSON")
-    }
-
-    fn parse_cookie_pair(set_cookie_value: &str) -> String {
-        set_cookie_value
-            .split(';')
-            .next()
-            .unwrap_or_default()
-            .trim()
-            .to_string()
+        request.await
     }
 
     async fn create_user_with_password(
@@ -223,6 +204,41 @@ RETURNING id
         .fetch_one(pool)
         .await
         .expect("创建测试用户失败")
+    }
+
+    async fn ensure_admin_user_with_password(pool: &crate::db::DbPool, password: &str) -> Uuid {
+        let password_hash =
+            crate::password::hash_password_argon2id(password).expect("生成管理员密码哈希失败");
+
+        sqlx::query_scalar::<_, Uuid>(
+            r#"
+INSERT INTO users (
+    username,
+    display_name,
+    email,
+    is_active,
+    metadata,
+    password_hash,
+    auth_version,
+    deleted_at
+)
+VALUES ('admin', 'admin-display', 'admin@local.invalid', TRUE, '{}'::jsonb, $1, 0, NULL)
+ON CONFLICT (username) WHERE deleted_at IS NULL AND username IS NOT NULL
+DO UPDATE SET
+    display_name = EXCLUDED.display_name,
+    email = EXCLUDED.email,
+    is_active = TRUE,
+    password_hash = EXCLUDED.password_hash,
+    auth_version = 0,
+    deleted_at = NULL,
+    updated_at = NOW()
+RETURNING id
+            "#,
+        )
+        .bind(password_hash)
+        .fetch_one(pool)
+        .await
+        .expect("创建或更新管理员测试用户失败")
     }
 
     async fn create_or_update_user_with_password(
@@ -277,7 +293,7 @@ RETURNING id
         .expect("清理测试用户失败");
     }
 
-    async fn setup_user_management_test_app() -> Option<(crate::db::DbPool, Router)> {
+    async fn setup_user_management_test_app() -> Option<(crate::db::DbPool, TestServer)> {
         let Some(database_url) = database_url_for_e2e() else {
             eprintln!("跳过 e2e：未设置 DATABASE_URL");
             return None;
@@ -294,7 +310,7 @@ RETURNING id
             .await
             .expect("执行迁移失败");
 
-        let jwt_secret = format!("e2e-secret-{}", Uuid::new_v4());
+        let jwt_secret = E2E_JWT_SECRET.to_string();
         sqlx::query!(
             r#"
 INSERT INTO system_config (key, value, description)
@@ -317,16 +333,18 @@ SET value = EXCLUDED.value,
             db: pool.clone(),
         };
 
-        Some((pool, app_router(state)))
+        let server = TestServer::new(app_router(state)).expect("创建测试服务器失败");
+
+        Some((pool, server))
     }
 
     async fn login_and_get_tokens(
-        app: &Router,
+        server: &TestServer,
         username: &str,
         password: &str,
     ) -> (String, String) {
         let response = request_json(
-            app,
+            server,
             Method::POST,
             "/api/v1/sessions",
             None,
@@ -338,18 +356,13 @@ SET value = EXCLUDED.value,
         )
         .await;
 
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status_code(), StatusCode::OK);
 
-        let set_cookie = response
-            .headers()
-            .get(header::SET_COOKIE)
-            .and_then(|v| v.to_str().ok())
-            .expect("登录响应缺少 Set-Cookie")
-            .to_string();
-        let cookie_pair = parse_cookie_pair(&set_cookie);
+        let refresh_cookie = response.cookie("refresh_token");
+        let cookie_pair = format!("refresh_token={}", refresh_cookie.value());
         assert!(cookie_pair.starts_with("refresh_token="));
 
-        let body = response_json(response).await;
+        let body = response.json::<Value>();
         let token = body
             .get("token")
             .and_then(Value::as_str)
@@ -359,410 +372,8 @@ SET value = EXCLUDED.value,
         (token, cookie_pair)
     }
 
-    #[tokio::test]
-    async fn delete_user_should_soft_delete_and_hide_from_default_list() {
-        let Some((pool, app)) = setup_user_management_test_app().await else {
-            return;
-        };
-
-        let admin_password = "AdminPassword#A123";
-        let admin_id = create_or_update_user_with_password(
-            &pool,
-            "admin",
-            "admin@local.invalid",
-            admin_password,
-        )
-        .await;
-
-        let victim_username = format!("soft_delete_target_{}", Uuid::new_v4().simple());
-        let victim_email = format!("{victim_username}@example.invalid");
-        let victim_id = create_or_update_user_with_password(
-            &pool,
-            &victim_username,
-            &victim_email,
-            "TargetPassword#A123",
-        )
-        .await;
-
-        let (admin_token, _) = login_and_get_tokens(&app, "admin", admin_password).await;
-
-        let delete_response = request_json(
-            &app,
-            Method::DELETE,
-            &format!("/api/v1/users/{victim_id}"),
-            Some(&admin_token),
-            None,
-            None,
-        )
-        .await;
-        assert_eq!(delete_response.status(), StatusCode::NO_CONTENT);
-
-        let list_response = request_json(
-            &app,
-            Method::GET,
-            "/api/v1/users",
-            Some(&admin_token),
-            None,
-            None,
-        )
-        .await;
-        assert_eq!(list_response.status(), StatusCode::OK);
-        let users = response_json(list_response).await;
-        let users = users.as_array().expect("用户列表响应体应为 JSON 数组");
-        let victim_visible = users.iter().any(|user| {
-            user.get("id").and_then(Value::as_str) == Some(victim_id.to_string().as_str())
-        });
-        assert!(!victim_visible, "默认列表不应包含已逻辑删除用户");
-
-        cleanup_test_users(&pool, &[admin_id, victim_id]).await;
-    }
-
-    #[tokio::test]
-    async fn deleted_user_email_should_be_reusable() {
-        let Some((pool, app)) = setup_user_management_test_app().await else {
-            return;
-        };
-
-        let admin_password = "AdminPassword#A123";
-        let admin_id = create_or_update_user_with_password(
-            &pool,
-            "admin",
-            "admin@local.invalid",
-            admin_password,
-        )
-        .await;
-
-        let reusable_email = format!("reusable_{}@example.invalid", Uuid::new_v4().simple());
-        let user_a_username = format!("reuse_user_a_{}", Uuid::new_v4().simple());
-        let user_a_id = create_or_update_user_with_password(
-            &pool,
-            &user_a_username,
-            &reusable_email,
-            "UserAPassword#A123",
-        )
-        .await;
-
-        let (admin_token, _) = login_and_get_tokens(&app, "admin", admin_password).await;
-
-        let delete_response = request_json(
-            &app,
-            Method::DELETE,
-            &format!("/api/v1/users/{user_a_id}"),
-            Some(&admin_token),
-            None,
-            None,
-        )
-        .await;
-        assert_eq!(delete_response.status(), StatusCode::NO_CONTENT);
-
-        let user_b_username = format!("reuse_user_b_{}", Uuid::new_v4().simple());
-        let create_response = request_json(
-            &app,
-            Method::POST,
-            "/api/v1/users",
-            Some(&admin_token),
-            None,
-            Some(json!({
-                "username": user_b_username,
-                "display_name": "Reusable Email User",
-                "email": reusable_email,
-            })),
-        )
-        .await;
-        assert_eq!(create_response.status(), StatusCode::CREATED);
-        let created = response_json(create_response).await;
-        let user_b_id = created
-            .get("id")
-            .and_then(Value::as_str)
-            .and_then(|id| Uuid::parse_str(id).ok())
-            .expect("创建用户响应应包含合法 id");
-
-        cleanup_test_users(&pool, &[admin_id, user_a_id, user_b_id]).await;
-    }
-
-    #[tokio::test]
-    async fn non_admin_should_forbidden_on_user_management_routes() {
-        let Some((pool, app)) = setup_user_management_test_app().await else {
-            return;
-        };
-
-        let username = format!("normal_user_{}", Uuid::new_v4().simple());
-        let email = format!("{username}@example.invalid");
-        let password = "NormalUserPassword#A123";
-        let normal_user_id =
-            create_or_update_user_with_password(&pool, &username, &email, password).await;
-
-        let target_username = format!("target_user_{}", Uuid::new_v4().simple());
-        let target_email = format!("{target_username}@example.invalid");
-        let target_user_id = create_or_update_user_with_password(
-            &pool,
-            &target_username,
-            &target_email,
-            "TargetPassword#A123",
-        )
-        .await;
-
-        let (token, _) = login_and_get_tokens(&app, &username, password).await;
-
-        let routes = vec![
-            (Method::GET, "/api/v1/users".to_string(), None),
-            (
-                Method::POST,
-                "/api/v1/users".to_string(),
-                Some(json!({
-                    "username": format!("created_by_normal_{}", Uuid::new_v4().simple()),
-                    "display_name": "should fail",
-                    "email": format!("create_by_normal_{}@example.invalid", Uuid::new_v4().simple()),
-                })),
-            ),
-            (
-                Method::PATCH,
-                format!("/api/v1/users/{target_user_id}"),
-                Some(json!({
-                    "display_name": "updated by normal",
-                })),
-            ),
-            (
-                Method::DELETE,
-                format!("/api/v1/users/{target_user_id}"),
-                None,
-            ),
-            (
-                Method::POST,
-                format!("/api/v1/users/{target_user_id}/restore"),
-                None,
-            ),
-        ];
-
-        for (method, uri, body) in routes {
-            let response = request_json(&app, method, &uri, Some(&token), None, body).await;
-            assert_eq!(
-                response.status(),
-                StatusCode::FORBIDDEN,
-                "非管理员访问 {uri} 应返回 403"
-            );
-            let body = response_json(response).await;
-            assert_eq!(body.get("code").and_then(Value::as_u64), Some(2002));
-        }
-
-        cleanup_test_users(&pool, &[normal_user_id, target_user_id]).await;
-    }
-
-    #[tokio::test]
-    async fn restore_user_should_reactivate_soft_deleted_user() {
-        let Some((pool, app)) = setup_user_management_test_app().await else {
-            return;
-        };
-
-        let admin_password = "AdminPassword#A123";
-        let admin_id = create_or_update_user_with_password(
-            &pool,
-            "admin",
-            "admin@local.invalid",
-            admin_password,
-        )
-        .await;
-
-        let username = format!("restore_target_{}", Uuid::new_v4().simple());
-        let email = format!("{username}@example.invalid");
-        let user_id =
-            create_or_update_user_with_password(&pool, &username, &email, "TargetPassword#A123")
-                .await;
-
-        let (admin_token, _) = login_and_get_tokens(&app, "admin", admin_password).await;
-
-        let delete_response = request_json(
-            &app,
-            Method::DELETE,
-            &format!("/api/v1/users/{user_id}"),
-            Some(&admin_token),
-            None,
-            None,
-        )
-        .await;
-        assert_eq!(delete_response.status(), StatusCode::NO_CONTENT);
-
-        let restore_response = request_json(
-            &app,
-            Method::POST,
-            &format!("/api/v1/users/{user_id}/restore"),
-            Some(&admin_token),
-            None,
-            None,
-        )
-        .await;
-        assert_eq!(restore_response.status(), StatusCode::OK);
-        let restored = response_json(restore_response).await;
-        assert_eq!(
-            restored.get("id").and_then(Value::as_str),
-            Some(user_id.to_string().as_str())
-        );
-
-        let list_response = request_json(
-            &app,
-            Method::GET,
-            "/api/v1/users?include_deleted=true",
-            Some(&admin_token),
-            None,
-            None,
-        )
-        .await;
-        assert_eq!(list_response.status(), StatusCode::OK);
-        let users = response_json(list_response).await;
-        let users = users.as_array().expect("用户列表响应体应为 JSON 数组");
-        let restored_user = users
-            .iter()
-            .find(|user| {
-                user.get("id").and_then(Value::as_str) == Some(user_id.to_string().as_str())
-            })
-            .expect("include_deleted 列表应包含恢复后的用户");
-        assert_eq!(
-            restored_user.get("is_active").and_then(Value::as_bool),
-            Some(true)
-        );
-
-        cleanup_test_users(&pool, &[admin_id, user_id]).await;
-    }
-
-    #[tokio::test]
-    async fn password_change_should_only_invalidate_current_user_sessions() {
-        let Some(database_url) = database_url_for_e2e() else {
-            eprintln!("跳过 e2e：未设置 DATABASE_URL");
-            return;
-        };
-
-        let pool = PgPoolOptions::new()
-            .max_connections(5)
-            .connect(&database_url)
-            .await
-            .expect("连接测试数据库失败");
-
-        sqlx::migrate!("./migrations")
-            .run(&pool)
-            .await
-            .expect("执行迁移失败");
-
-        let jwt_secret = format!("e2e-secret-{}", Uuid::new_v4());
-        sqlx::query!(
-            r#"
-INSERT INTO system_config (key, value, description)
-VALUES ('security.jwt_secret', $1, 'e2e test secret')
-ON CONFLICT (key) DO UPDATE
-SET value = EXCLUDED.value,
-    updated_at = NOW()
-            "#,
-            Value::String(jwt_secret),
-        )
-        .execute(&pool)
-        .await
-        .expect("写入测试 jwt secret 失败");
-
-        let username_a = format!("e2e_user_a_{}", Uuid::new_v4().simple());
-        let username_b = format!("e2e_user_b_{}", Uuid::new_v4().simple());
-        let password_a_old = "OldPassword#A123";
-        let password_a_new = "NewPassword#A123";
-        let password_b = "StablePassword#B123";
-
-        let user_a_id = create_user_with_password(&pool, &username_a, password_a_old).await;
-        let user_b_id = create_user_with_password(&pool, &username_b, password_b).await;
-
-        let runtime = crate::config::runtime::RuntimeConfig::load_from_db(&pool)
-            .await
-            .expect("加载运行时配置失败");
-        let state = AppState {
-            config: Arc::new(ArcSwap::from_pointee(runtime)),
-            db: pool.clone(),
-        };
-        let app = app_router(state);
-
-        let (access_a_old, refresh_a_old) =
-            login_and_get_tokens(&app, &username_a, password_a_old).await;
-        let (access_b_old, refresh_b_old) =
-            login_and_get_tokens(&app, &username_b, password_b).await;
-
-        let patch_response = request_json(
-            &app,
-            Method::PATCH,
-            "/api/v1/security/password",
-            Some(&access_a_old),
-            None,
-            Some(serde_json::json!({
-                "current_password": password_a_old,
-                "new_password": password_a_new,
-            })),
-        )
-        .await;
-        assert_eq!(patch_response.status(), StatusCode::NO_CONTENT);
-
-        let me_a_old = request_json(
-            &app,
-            Method::GET,
-            "/api/v1/users/me",
-            Some(&access_a_old),
-            None,
-            None,
-        )
-        .await;
-        assert_eq!(me_a_old.status(), StatusCode::UNAUTHORIZED);
-        let me_a_old_body = response_json(me_a_old).await;
-        assert_eq!(
-            me_a_old_body.get("code").and_then(Value::as_u64),
-            Some(1001)
-        );
-
-        let refresh_a_old_response = request_json(
-            &app,
-            Method::POST,
-            "/api/v1/sessions/refresh",
-            None,
-            Some(&refresh_a_old),
-            None,
-        )
-        .await;
-        assert_eq!(refresh_a_old_response.status(), StatusCode::UNAUTHORIZED);
-        let refresh_a_old_body = response_json(refresh_a_old_response).await;
-        assert_eq!(
-            refresh_a_old_body.get("code").and_then(Value::as_u64),
-            Some(1001)
-        );
-
-        let me_b_old = request_json(
-            &app,
-            Method::GET,
-            "/api/v1/users/me",
-            Some(&access_b_old),
-            None,
-            None,
-        )
-        .await;
-        assert_eq!(me_b_old.status(), StatusCode::OK);
-
-        let refresh_b_old_response = request_json(
-            &app,
-            Method::POST,
-            "/api/v1/sessions/refresh",
-            None,
-            Some(&refresh_b_old),
-            None,
-        )
-        .await;
-        assert_eq!(refresh_b_old_response.status(), StatusCode::OK);
-
-        sqlx::query!(
-            "DELETE FROM auth_sessions WHERE user_id = $1 OR user_id = $2",
-            user_a_id,
-            user_b_id
-        )
-        .execute(&pool)
-        .await
-        .expect("清理测试会话失败");
-        sqlx::query!(
-            "DELETE FROM users WHERE id = $1 OR id = $2",
-            user_a_id,
-            user_b_id
-        )
-        .execute(&pool)
-        .await
-        .expect("清理测试用户失败");
-    }
+    mod security;
+    mod sessions;
+    mod settings;
+    mod users;
 }
