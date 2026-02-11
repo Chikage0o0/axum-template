@@ -31,17 +31,7 @@
     return preferredMode === "dark" ? "深色" : "浅色";
   });
 
-  let breadcrumb = $derived.by(() => {
-    if (pathname.startsWith("/users")) {
-      return { section: "管理", page: "用户管理" };
-    }
-
-    if (pathname === "/settings") {
-      return { section: "管理", page: "设置" };
-    }
-
-    return { section: "管理", page: "仪表盘" };
-  });
+  let breadcrumb = $derived(page.data.breadcrumb ?? { section: "管理", page: "仪表盘" });
 
   async function handleLogout() {
     try {

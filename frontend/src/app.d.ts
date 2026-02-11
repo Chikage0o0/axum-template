@@ -5,6 +5,10 @@ declare global {
     // interface Locals {}
     interface PageData {
       pageTitle?: string;
+      breadcrumb?: {
+        section: string;
+        page: string;
+      };
     }
     // interface Platform {}
   }

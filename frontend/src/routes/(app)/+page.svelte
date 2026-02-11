@@ -1,12 +1,11 @@
 <script lang="ts">
   import { Button } from "$lib/shadcn/components/ui/button/index.js";
   import * as Card from "$lib/shadcn/components/ui/card/index.js";
+  import PageHeader from "$lib/shared/components/page-header.svelte";
 </script>
 
 <div class="content-flow space-y-6">
-  <div>
-    <h1 class="text-2xl font-semibold tracking-tight">仪表盘</h1>
-  </div>
+  <PageHeader title="仪表盘" />
 
   <Card.Root>
     <Card.Header>

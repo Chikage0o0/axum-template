@@ -13,10 +13,12 @@
   import { type FieldErrors, zodErrorToFieldErrors } from "$lib/shared/forms/field-errors";
   import { useFieldErrors } from "$lib/shared/forms/use-field-errors.svelte";
   import PasswordInput from "$lib/shared/components/password-input.svelte";
+  import PageHeader from "$lib/shared/components/page-header.svelte";
   import { Button } from "$lib/shadcn/components/ui/button/index.js";
   import * as Card from "$lib/shadcn/components/ui/card/index.js";
   import * as Field from "$lib/shadcn/components/ui/field/index.js";
   import { Input } from "$lib/shadcn/components/ui/input/index.js";
+  import { Skeleton } from "$lib/shadcn/components/ui/skeleton/index.js";
 
   let settings = $state<SettingsResponse | null>(null);
   let loading = $state(false);
@@ -154,9 +156,7 @@
 </script>
 
 <div class="content-flow space-y-6">
-  <div>
-    <h1 class="text-2xl font-semibold tracking-tight">设置</h1>
-  </div>
+  <PageHeader title="设置" />
 
   <Card.Root id="runtime">
     <Card.Header class="space-y-3">
@@ -183,6 +183,30 @@
         emptyTitle="尚未加载配置"
         emptyDescription="请点击刷新重新加载配置。"
       >
+        {#snippet loadingContent()}
+          <div class="space-y-5">
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div class="space-y-2">
+                <Skeleton class="h-4 w-44" />
+                <Skeleton class="h-10 w-full" />
+              </div>
+              <div class="space-y-2">
+                <Skeleton class="h-4 w-56" />
+                <Skeleton class="h-10 w-full" />
+              </div>
+              <div class="space-y-2 sm:col-span-2">
+                <Skeleton class="h-4 w-48" />
+                <Skeleton class="h-10 w-full" />
+              </div>
+              <div class="space-y-2 sm:col-span-2">
+                <Skeleton class="h-4 w-52" />
+                <Skeleton class="h-3 w-24" />
+                <Skeleton class="h-10 w-full" />
+              </div>
+            </div>
+          </div>
+        {/snippet}
+
         <div class="grid gap-4 sm:grid-cols-2">
           <Field.Field
             data-invalid={invalidSettings("check_interval_secs", "app.check_interval_secs") ||

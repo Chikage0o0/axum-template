@@ -40,7 +40,7 @@
     </DropdownMenu.Item>
     <DropdownMenu.Separator />
     {#if isSelf}
-      <Tooltip.Provider>
+      <Tooltip.Provider ignoreNonKeyboardFocus={true}>
         <Tooltip.Root>
           <Tooltip.Trigger>
             {#snippet child({ props })}

@@ -15,14 +15,8 @@
     CreateUserRequest as CreateUserRequestSchema,
     PatchUserRequest as PatchUserRequestSchema,
   } from "$lib/api/generated/schemas";
-  import {
-    detailsToFieldErrors,
-    hasFieldError,
-    mergeFieldErrors,
-    toFieldErrorItems,
-    type FieldErrors,
-    zodErrorToFieldErrors,
-  } from "$lib/shared/forms/field-errors";
+  import { type FieldErrors, zodErrorToFieldErrors } from "$lib/shared/forms/field-errors";
+  import { useFieldErrors } from "$lib/shared/forms/use-field-errors.svelte";
   import { auth } from "$lib/features/auth/state/auth";
   import { buildUserPatchPayload } from "$lib/features/auth/model/user-helpers";
   import * as AlertDialog from "$lib/shadcn/components/ui/alert-dialog/index.js";
@@ -32,6 +26,7 @@
   import * as Field from "$lib/shadcn/components/ui/field/index.js";
   import { Input } from "$lib/shadcn/components/ui/input/index.js";
   import * as Sheet from "$lib/shadcn/components/ui/sheet/index.js";
+  import { Skeleton } from "$lib/shadcn/components/ui/skeleton/index.js";
   import { Switch } from "$lib/shadcn/components/ui/switch/index.js";
   import * as Table from "$lib/shadcn/components/ui/table/index.js";
   import TruncateText from "$lib/shared/components/truncate-text.svelte";
@@ -41,6 +36,7 @@
   import LoadStatePanel from "$lib/shared/components/load-state-panel.svelte";
   import UserProfileFields from "$lib/shared/components/user-profile-fields.svelte";
   import UsersToolbar from "$lib/app/components/users-toolbar.svelte";
+  import PageHeader from "$lib/shared/components/page-header.svelte";
 
   type SheetMode = "create" | "edit";
   type UserFormDraft = {
@@ -69,7 +65,7 @@
   let sheetOpen = $state(false);
   let sheetMode = $state<SheetMode>("create");
   let sheetSubmitting = $state(false);
-  let sheetFieldErrors = $state<FieldErrors>({});
+  const sheetFieldErrors = useFieldErrors<string>();
   let selectedUser = $state<UserResponse | null>(null);
   let draft = $state<UserFormDraft>(emptyDraft());
 
@@ -81,24 +77,25 @@
 
   const sheetTitle = $derived(sheetMode === "create" ? "新增用户" : "编辑用户");
   const sheetSubmitLabel = $derived(sheetMode === "create" ? "创建用户" : "保存修改");
+  const activeUserCount = $derived(users.filter((user) => user.is_active).length);
 
   function isSelfRow(userId: string): boolean {
     return $auth.user?.sub === userId;
   }
 
   function invalidSheet(...keys: string[]): boolean {
-    return hasFieldError(sheetFieldErrors, ...keys);
+    return sheetFieldErrors.invalid(...keys);
   }
 
   function sheetErrorItems(...keys: string[]) {
-    return toFieldErrorItems(sheetFieldErrors, ...keys);
+    return sheetFieldErrors.items(...keys);
   }
 
   function openCreateSheet() {
     sheetMode = "create";
     selectedUser = null;
     draft = emptyDraft();
-    sheetFieldErrors = {};
+    sheetFieldErrors.clearErrors();
     sheetOpen = true;
   }
 
@@ -113,13 +110,13 @@
       avatar_url: user.avatar_url ?? "",
       is_active: user.is_active,
     };
-    sheetFieldErrors = {};
+    sheetFieldErrors.clearErrors();
     sheetOpen = true;
   }
 
   function closeSheet() {
     sheetOpen = false;
-    sheetFieldErrors = {};
+    sheetFieldErrors.clearErrors();
     selectedUser = null;
     draft = emptyDraft();
     sheetMode = "create";
@@ -194,10 +191,10 @@
   }
 
   async function submitSheet() {
-    sheetFieldErrors = {};
+    sheetFieldErrors.clearErrors();
 
     if (sheetMode === "edit" && selectedUser && isSelfRow(selectedUser.id) && !draft.is_active) {
-      sheetFieldErrors = { is_active: ["当前登录账号不允许自禁用"] };
+      sheetFieldErrors.setErrors({ is_active: ["当前登录账号不允许自禁用"] });
       toast.error("当前登录账号不允许自禁用");
       return;
     }
@@ -207,7 +204,7 @@
       if (sheetMode === "create") {
         const result = makeCreatePayloadFromDraft();
         if (!result.ok) {
-          sheetFieldErrors = result.errors;
+          sheetFieldErrors.setErrors(result.errors);
           return;
         }
         await createUserHandler(result.payload);
@@ -221,7 +218,7 @@
         const result = makePatchPayloadFromDraft();
         if (!result.ok) {
           if (result.errors) {
-            sheetFieldErrors = result.errors;
+            sheetFieldErrors.setErrors(result.errors);
           } else {
             toast.warning(result.message);
           }
@@ -235,9 +232,8 @@
       await reloadUsers();
     } catch (e) {
       if (e instanceof ApiError) {
-        const mapped = detailsToFieldErrors(e.body?.details);
-        sheetFieldErrors = mergeFieldErrors(sheetFieldErrors, mapped);
-        if (Object.keys(mapped).length > 0) {
+        sheetFieldErrors.mergeApiDetails(e.body?.details);
+        if (Object.keys(sheetFieldErrors.errors).length > 0) {
           return;
         }
       }
@@ -283,10 +279,11 @@
 
 <div class="content-flow space-y-6">
   <!-- 页面标题栏 -->
-  <div class="flex flex-wrap items-center justify-between gap-3">
-    <h1 class="text-2xl font-semibold tracking-tight">用户管理</h1>
-    <UsersToolbar loading={listLoading} onRefresh={reloadUsers} onCreate={openCreateSheet} />
-  </div>
+  <PageHeader title="用户管理">
+    {#snippet actions()}
+      <UsersToolbar loading={listLoading} onRefresh={reloadUsers} onCreate={openCreateSheet} />
+    {/snippet}
+  </PageHeader>
 
   {#if permissionDenied}
     <Empty.Root>
@@ -297,9 +294,19 @@
     </Empty.Root>
   {:else}
     <Card.Root>
-      <Card.Header class="space-y-2">
-        <Card.Title>用户列表</Card.Title>
-        <Card.Description>默认仅显示未删除用户；删除后用户将从此列表移除。</Card.Description>
+      <Card.Header class="space-y-3">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="space-y-1">
+            <Card.Title>用户列表</Card.Title>
+            <Card.Description>默认仅显示未删除用户；删除后用户将从此列表移除。</Card.Description>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <Badge variant="secondary" class="font-normal">总计 {users.length}</Badge>
+            <Badge class="border-success/30 bg-success/10 text-success"
+              >启用 {activeUserCount}</Badge
+            >
+          </div>
+        </div>
       </Card.Header>
 
       <Card.Content>
@@ -312,57 +319,63 @@
           emptyTitle="暂无用户数据"
           emptyDescription="可以先新增一个用户。"
           createLabel="新增用户"
-          loadingRows={5}
         >
-          <Table.Root class="table-fixed">
-            <Table.Header>
-              <Table.Row>
-                <Table.Head class="w-[30%]">用户</Table.Head>
-                <Table.Head class="w-[25%]">用户名</Table.Head>
-                <Table.Head class="w-[25%]">邮箱</Table.Head>
-                <Table.Head class="w-[10%]">状态</Table.Head>
-                <Table.Head class="w-[10%]"></Table.Head>
-              </Table.Row>
-            </Table.Header>
-
-            <Table.Body>
-              {#each users as user (user.id)}
-                <Table.Row class={isSelfRow(user.id) ? "bg-muted/40" : ""}>
-                  <!-- 头像 + 显示名称 -->
-                  <Table.Cell>
-                    <div class="flex items-center gap-3 min-w-0">
-                      <UserAvatar
-                        src={user.avatar_url ?? ""}
-                        alt={user.display_name}
-                        email={user.email}
-                        displayName={user.display_name}
-                        id={user.id}
-                      />
-                      <div class="flex flex-col min-w-0">
-                        <TruncateText text={user.display_name} class="font-medium leading-tight" />
-                        {#if isSelfRow(user.id)}
-                          <span class="text-muted-foreground text-xs">当前账号</span>
-                        {/if}
-                      </div>
+          {#snippet loadingContent()}
+            <div class="space-y-3">
+              {#each Array.from({ length: 5 }, (_, index) => index) as index (index)}
+                <div
+                  class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg border bg-gradient-to-br from-card to-muted/30 p-3 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)_minmax(0,2fr)_minmax(0,1fr)_auto]"
+                >
+                  <div class="flex min-w-0 items-center gap-3">
+                    <Skeleton class="size-8 shrink-0 rounded-full" />
+                    <div class="min-w-0 space-y-2">
+                      <Skeleton class="h-4 w-24" />
+                      <Skeleton class="h-3 w-16" />
                     </div>
-                  </Table.Cell>
-                  <Table.Cell class="text-muted-foreground">
-                    <TruncateText text={user.username ?? "-"} />
-                  </Table.Cell>
-                  <Table.Cell class="text-muted-foreground">
-                    <TruncateText text={user.email} />
-                  </Table.Cell>
-                  <Table.Cell>
-                    {#if user.is_active}
-                      <Badge
-                        class="border-emerald-600/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                        >启用</Badge
-                      >
-                    {:else}
-                      <Badge variant="destructive">禁用</Badge>
-                    {/if}
-                  </Table.Cell>
-                  <Table.Cell>
+                  </div>
+                  <Skeleton class="hidden h-4 w-20 sm:block" />
+                  <Skeleton class="hidden h-4 w-36 sm:block" />
+                  <Skeleton class="hidden h-5 w-12 rounded-full sm:block" />
+                  <div class="flex justify-end">
+                    <Skeleton class="h-8 w-8 rounded-md" />
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/snippet}
+
+          <div class="space-y-3 md:hidden">
+            {#each users as user (user.id)}
+              <article
+                class={`rounded-xl border bg-gradient-to-br p-4 shadow-sm transition-colors ${
+                  isSelfRow(user.id)
+                    ? "border-primary/30 from-primary/10 to-card"
+                    : "from-card to-muted/30 hover:border-primary/20"
+                }`}
+              >
+                <div class="flex items-start gap-3">
+                  <UserAvatar
+                    class="size-9"
+                    src={user.avatar_url ?? ""}
+                    alt={user.display_name}
+                    email={user.email}
+                    displayName={user.display_name}
+                    id={user.id}
+                  />
+                  <div class="min-w-0 flex-1">
+                    <TruncateText text={user.display_name} class="font-medium leading-tight" />
+                    <div class="mt-2 flex flex-wrap items-center gap-2">
+                      {#if user.is_active}
+                        <Badge class="border-success/30 bg-success/10 text-success">启用</Badge>
+                      {:else}
+                        <Badge variant="destructive">禁用</Badge>
+                      {/if}
+                      {#if isSelfRow(user.id)}
+                        <Badge variant="secondary">当前账号</Badge>
+                      {/if}
+                    </div>
+                  </div>
+                  <div class="shrink-0">
                     <UserRowActions
                       row={user}
                       currentUserId={$auth.user?.sub}
@@ -370,11 +383,92 @@
                       onEdit={openEditSheet}
                       onDelete={requestDelete}
                     />
-                  </Table.Cell>
+                  </div>
+                </div>
+
+                <dl class="mt-3 space-y-2 border-t pt-3 text-sm">
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="text-muted-foreground shrink-0">用户名</dt>
+                    <dd class="min-w-0 flex-1 text-right">
+                      <TruncateText
+                        text={user.username ?? "-"}
+                        class="text-foreground text-right"
+                      />
+                    </dd>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="text-muted-foreground shrink-0">邮箱</dt>
+                    <dd class="min-w-0 flex-1 text-right">
+                      <TruncateText text={user.email} class="text-foreground text-right" />
+                    </dd>
+                  </div>
+                </dl>
+              </article>
+            {/each}
+          </div>
+
+          <div class="hidden md:block">
+            <Table.Root class="table-fixed">
+              <Table.Header>
+                <Table.Row>
+                  <Table.Head class="w-[34%]">用户</Table.Head>
+                  <Table.Head class="w-[20%]">用户名</Table.Head>
+                  <Table.Head class="w-[28%]">邮箱</Table.Head>
+                  <Table.Head class="w-[10%]">状态</Table.Head>
+                  <Table.Head class="w-[8%]"></Table.Head>
                 </Table.Row>
-              {/each}
-            </Table.Body>
-          </Table.Root>
+              </Table.Header>
+
+              <Table.Body>
+                {#each users as user (user.id)}
+                  <Table.Row class={isSelfRow(user.id) ? "bg-muted/40" : "hover:bg-muted/20"}>
+                    <Table.Cell>
+                      <div class="flex min-w-0 items-center gap-3">
+                        <UserAvatar
+                          src={user.avatar_url ?? ""}
+                          alt={user.display_name}
+                          email={user.email}
+                          displayName={user.display_name}
+                          id={user.id}
+                        />
+                        <div class="flex min-w-0 flex-col">
+                          <TruncateText
+                            text={user.display_name}
+                            class="font-medium leading-tight"
+                          />
+                          {#if isSelfRow(user.id)}
+                            <span class="text-muted-foreground text-xs">当前账号</span>
+                          {/if}
+                        </div>
+                      </div>
+                    </Table.Cell>
+                    <Table.Cell class="text-muted-foreground">
+                      <TruncateText text={user.username ?? "-"} />
+                    </Table.Cell>
+                    <Table.Cell class="text-muted-foreground">
+                      <TruncateText text={user.email} />
+                    </Table.Cell>
+                    <Table.Cell>
+                      {#if user.is_active}
+                        <Badge class="border-success/30 bg-success/10 text-success">启用</Badge>
+                      {:else}
+                        <Badge variant="destructive">禁用</Badge>
+                      {/if}
+                    </Table.Cell>
+                    <Table.Cell>
+                      <UserRowActions
+                        row={user}
+                        currentUserId={$auth.user?.sub}
+                        {deletingUserId}
+                        onEdit={openEditSheet}
+                        onDelete={requestDelete}
+                      />
+                    </Table.Cell>
+                  </Table.Row>
+                {/each}
+              </Table.Body>
+            </Table.Root>
+          </div>
         </LoadStatePanel>
       </Card.Content>
     </Card.Root>
@@ -428,7 +522,7 @@
     >
       <UserProfileFields
         bind:draft
-        errors={sheetFieldErrors}
+        errors={sheetFieldErrors.errors}
         disabled={sheetSubmitting}
         idPrefix="user"
       />
