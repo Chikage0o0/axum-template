@@ -2,11 +2,9 @@ use super::*;
 
 use serde_json::Value;
 
-#[tokio::test]
-async fn get_settings_should_require_auth_and_return_runtime_config() {
-    let Some((pool, server)) = setup_user_management_test_app().await else {
-        return;
-    };
+#[sqlx::test(migrations = "./migrations")]
+async fn get_settings_should_require_auth_and_return_runtime_config(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
 
     let anonymous_response =
         request_json(&server, Method::GET, "/api/v1/settings", None, None, None).await;

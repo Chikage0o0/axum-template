@@ -1,5 +1,7 @@
 import { writable } from "svelte/store";
 import type { AuthUser } from "$lib/features/auth/model/auth-user";
+import type { AuthRole } from "$lib/features/auth/model/token-role";
+import { readRoleFromToken } from "$lib/features/auth/model/token-role";
 
 export type Flash = { title: string; message: string };
 
@@ -7,6 +9,7 @@ export type AuthState = {
   isAuthenticated: boolean;
   token: string | null;
   user: AuthUser | null;
+  role: AuthRole;
   flash: Flash | null;
 };
 
@@ -14,6 +17,7 @@ const initialState: AuthState = {
   isAuthenticated: false,
   token: null,
   user: null,
+  role: "user",
   flash: null,
 };
 
@@ -34,6 +38,7 @@ export const auth = {
       isAuthenticated: true,
       token,
       user: null,
+      role: readRoleFromToken(token),
       flash: null,
     });
   },
@@ -43,7 +48,7 @@ export const auth = {
         ? { title: "登录失效", message: "令牌已过期或无效，请重新登录" }
         : null;
 
-    store.set({ isAuthenticated: false, token: null, user: null, flash });
+    store.set({ isAuthenticated: false, token: null, user: null, role: "user", flash });
   },
   clearFlash() {
     store.update((s) => ({ ...s, flash: null }));

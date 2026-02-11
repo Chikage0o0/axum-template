@@ -2,11 +2,9 @@ use super::*;
 
 use serde_json::{json, Value};
 
-#[tokio::test]
-async fn password_change_should_only_invalidate_current_user_sessions() {
-    let Some((pool, server)) = setup_user_management_test_app().await else {
-        return;
-    };
+#[sqlx::test(migrations = "./migrations")]
+async fn password_change_should_only_invalidate_current_user_sessions(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
 
     let username_a = format!("e2e_user_a_{}", Uuid::new_v4().simple());
     let username_b = format!("e2e_user_b_{}", Uuid::new_v4().simple());

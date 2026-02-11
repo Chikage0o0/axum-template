@@ -38,6 +38,10 @@
   });
 
   let breadcrumb = $derived.by(() => {
+    if (pathname.startsWith("/users")) {
+      return { section: "管理", page: "用户管理" };
+    }
+
     if (pathname === "/settings") {
       return { section: "管理", page: "设置" };
     }
@@ -114,7 +118,12 @@
 </script>
 
 <Sidebar.Provider>
-  <AppSidebar currentPath={pathname} currentUser={$auth.user} onLogout={handleLogout} />
+  <AppSidebar
+    currentPath={pathname}
+    currentUser={$auth.user}
+    currentRole={$auth.role}
+    onLogout={handleLogout}
+  />
   <Sidebar.Inset class="aurora-surface">
     <header class="flex h-16 shrink-0 items-center gap-2 border-b">
       <div class="flex w-full items-center justify-between gap-2 px-4">

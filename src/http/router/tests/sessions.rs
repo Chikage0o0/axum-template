@@ -2,11 +2,9 @@ use super::*;
 
 use serde_json::Value;
 
-#[tokio::test]
-async fn session_refresh_and_logout_should_revoke_current_session() {
-    let Some((pool, server)) = setup_user_management_test_app().await else {
-        return;
-    };
+#[sqlx::test(migrations = "./migrations")]
+async fn session_refresh_and_logout_should_revoke_current_session(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
 
     let username = format!("session_user_{}", Uuid::new_v4().simple());
     let email = format!("{username}@example.invalid");

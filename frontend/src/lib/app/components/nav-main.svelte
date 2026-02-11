@@ -3,15 +3,13 @@
   import type { Component } from "svelte";
   import * as Sidebar from "$lib/shadcn/components/ui/sidebar/index.js";
 
-  type InternalRoute = Parameters<typeof resolve>[0];
-
   let {
     items,
     currentPath,
   }: {
     items: {
       title: string;
-      url: InternalRoute;
+      url: string;
       icon: Component;
       isActive?: boolean;
     }[];
@@ -35,7 +33,7 @@
           isActive={mainItem.isActive || itemActive(mainItem.url)}
         >
           {#snippet child({ props })}
-            <a href={resolve(mainItem.url)} {...props}>
+            <a href={resolve(mainItem.url as Parameters<typeof resolve>[0])} {...props}>
               <mainItem.icon />
               <span>{mainItem.title}</span>
             </a>

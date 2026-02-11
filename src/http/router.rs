@@ -137,15 +137,7 @@ mod tests {
     use axum::http::{header, Method, StatusCode};
     use axum_test::{TestResponse, TestServer};
     use serde_json::Value;
-    use sqlx::postgres::PgPoolOptions;
     use uuid::Uuid;
-
-    fn database_url_for_e2e() -> Option<String> {
-        std::env::var("DATABASE_URL")
-            .ok()
-            .map(|v| v.trim().to_string())
-            .filter(|v| !v.is_empty())
-    }
 
     const E2E_JWT_SECRET: &str = "router-tests-shared-jwt-secret";
 
@@ -293,18 +285,7 @@ RETURNING id
         .expect("清理测试用户失败");
     }
 
-    async fn setup_user_management_test_app() -> Option<(crate::db::DbPool, TestServer)> {
-        let Some(database_url) = database_url_for_e2e() else {
-            eprintln!("跳过 e2e：未设置 DATABASE_URL");
-            return None;
-        };
-
-        let pool = PgPoolOptions::new()
-            .max_connections(5)
-            .connect(&database_url)
-            .await
-            .expect("连接测试数据库失败");
-
+    async fn setup_user_management_test_app(pool: crate::db::DbPool) -> TestServer {
         sqlx::migrate!("./migrations")
             .run(&pool)
             .await
@@ -333,9 +314,7 @@ SET value = EXCLUDED.value,
             db: pool.clone(),
         };
 
-        let server = TestServer::new(app_router(state)).expect("创建测试服务器失败");
-
-        Some((pool, server))
+        TestServer::new(app_router(state)).expect("创建测试服务器失败")
     }
 
     async fn login_and_get_tokens(

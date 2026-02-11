@@ -59,6 +59,9 @@ in
         pass = dbPass;
       }
     ];
+    initialScript = ''
+      ALTER ROLE "${dbUser}" CREATEDB;
+    '';
   };
 
   enterShell = ''

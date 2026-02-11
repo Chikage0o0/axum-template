@@ -2,11 +2,9 @@ use super::*;
 
 use serde_json::{json, Value};
 
-#[tokio::test]
-async fn delete_user_should_soft_delete_and_hide_from_default_list() {
-    let Some((pool, server)) = setup_user_management_test_app().await else {
-        return;
-    };
+#[sqlx::test(migrations = "./migrations")]
+async fn delete_user_should_soft_delete_and_hide_from_default_list(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
 
     let admin_password = "AdminPassword#A123";
     ensure_admin_user_with_password(&pool, admin_password).await;
@@ -54,11 +52,9 @@ async fn delete_user_should_soft_delete_and_hide_from_default_list() {
     cleanup_test_users(&pool, &[victim_id]).await;
 }
 
-#[tokio::test]
-async fn deleted_user_email_should_be_reusable() {
-    let Some((pool, server)) = setup_user_management_test_app().await else {
-        return;
-    };
+#[sqlx::test(migrations = "./migrations")]
+async fn deleted_user_email_should_be_reusable(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
 
     let admin_password = "AdminPassword#A123";
     ensure_admin_user_with_password(&pool, admin_password).await;
@@ -111,11 +107,9 @@ async fn deleted_user_email_should_be_reusable() {
     cleanup_test_users(&pool, &[user_a_id, user_b_id]).await;
 }
 
-#[tokio::test]
-async fn non_admin_should_forbidden_on_user_management_routes() {
-    let Some((pool, server)) = setup_user_management_test_app().await else {
-        return;
-    };
+#[sqlx::test(migrations = "./migrations")]
+async fn non_admin_should_forbidden_on_user_management_routes(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
 
     let username = format!("normal_user_{}", Uuid::new_v4().simple());
     let email = format!("{username}@example.invalid");
@@ -179,11 +173,9 @@ async fn non_admin_should_forbidden_on_user_management_routes() {
     cleanup_test_users(&pool, &[normal_user_id, target_user_id]).await;
 }
 
-#[tokio::test]
-async fn restore_user_should_reactivate_soft_deleted_user() {
-    let Some((pool, server)) = setup_user_management_test_app().await else {
-        return;
-    };
+#[sqlx::test(migrations = "./migrations")]
+async fn restore_user_should_reactivate_soft_deleted_user(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
 
     let admin_password = "AdminPassword#A123";
     ensure_admin_user_with_password(&pool, admin_password).await;

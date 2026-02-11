@@ -213,7 +213,7 @@ INSERT INTO users (
     password_hash
 )
 VALUES ($1, $2, $3, TRUE, '{}'::jsonb, $4)
-ON CONFLICT (username) DO UPDATE
+ON CONFLICT (username) WHERE deleted_at IS NULL AND username IS NOT NULL DO UPDATE
 SET password_hash = COALESCE(NULLIF(users.password_hash, ''), EXCLUDED.password_hash),
     is_active = TRUE,
     updated_at = NOW()
@@ -244,4 +244,61 @@ pub fn hex_encode(bytes: &[u8]) -> String {
     }
     // 安全：TABLE 只包含 ASCII。
     String::from_utf8(out).unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uuid::Uuid;
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn seed_should_create_admin_user_with_password_when_missing(pool: sqlx::PgPool) {
+        sqlx::migrate!("./migrations")
+            .run(&pool)
+            .await
+            .expect("执行迁移失败");
+
+        let username = format!("seed-admin-{}", Uuid::new_v4().simple());
+        let password = "SeedPassword#A123".to_string();
+
+        sqlx::query!("DELETE FROM users WHERE username = $1", username)
+            .execute(&pool)
+            .await
+            .expect("清理测试管理员失败");
+
+        let opts = SeedOptions {
+            seed_admin_username: Some(username.clone()),
+            seed_admin_password: Some(password),
+        };
+
+        let result = seed_if_needed(&pool, &opts).await;
+        assert!(
+            result.is_ok(),
+            "seed 应能成功创建管理员用户，实际错误: {result:?}"
+        );
+
+        let hash = sqlx::query_scalar!(
+            r#"
+SELECT password_hash
+FROM users
+WHERE username = $1
+LIMIT 1
+            "#,
+            username,
+        )
+        .fetch_optional(&pool)
+        .await
+        .expect("查询测试管理员失败")
+        .flatten();
+
+        assert!(
+            hash.as_deref().is_some_and(|v| !v.trim().is_empty()),
+            "seed 创建后管理员密码哈希不应为空"
+        );
+
+        sqlx::query!("DELETE FROM users WHERE username = $1", username)
+            .execute(&pool)
+            .await
+            .expect("清理测试管理员失败");
+    }
 }
