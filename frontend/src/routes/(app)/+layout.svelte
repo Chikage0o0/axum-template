@@ -1,18 +1,13 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
   import { page } from "$app/state";
   import MonitorIcon from "@lucide/svelte/icons/monitor";
   import MoonIcon from "@lucide/svelte/icons/moon";
   import SunIcon from "@lucide/svelte/icons/sun";
   import AppSidebar from "$lib/app/components/app-sidebar.svelte";
-  import {
-    deleteCurrentSessionHandler,
-    getCurrentUserHandler,
-    refreshSessionHandler,
-  } from "$lib/api/generated/client";
-  import { toAuthUser } from "$lib/features/auth/model/user-helpers";
+  import { deleteCurrentSessionHandler } from "$lib/api/generated/client";
   import { auth } from "$lib/features/auth/state/auth";
+  import { useAuthBootstrap } from "$lib/features/auth/state/use-auth-bootstrap.svelte";
   import * as Breadcrumb from "$lib/shadcn/components/ui/breadcrumb/index.js";
   import { Button } from "$lib/shadcn/components/ui/button/index.js";
   import * as DropdownMenu from "$lib/shadcn/components/ui/dropdown-menu/index.js";
@@ -23,8 +18,7 @@
   let { children } = $props();
 
   let pathname = $derived(page.url.pathname);
-  let syncedToken = $state<string | null>(null);
-  let ensuringSession = false;
+  const authBootstrap = useAuthBootstrap();
 
   type ThemeMode = "light" | "dark" | "system";
   let preferredMode = $derived(userPrefersMode.current as ThemeMode);
@@ -49,67 +43,13 @@
     return { section: "管理", page: "仪表盘" };
   });
 
-  $effect(() => {
-    if ($auth.isAuthenticated || ensuringSession) return;
-
-    let cancelled = false;
-    ensuringSession = true;
-
-    void (async () => {
-      try {
-        const refreshed = await refreshSessionHandler();
-        if (cancelled) return;
-        auth.login(refreshed.token);
-      } catch {
-        if (cancelled) return;
-        auth.logout({ reason: "manual" });
-        await goto(resolve("/login"));
-      } finally {
-        ensuringSession = false;
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  });
-
-  $effect(() => {
-    const token = $auth.token;
-    const currentUser = $auth.user;
-    if (!token) {
-      syncedToken = null;
-      return;
-    }
-    if (token === syncedToken && currentUser) return;
-
-    let cancelled = false;
-    void (async () => {
-      try {
-        const currentUser = await getCurrentUserHandler();
-        if (cancelled) return;
-        const mapped = toAuthUser(currentUser);
-        if (mapped) {
-          auth.syncUser(mapped);
-        }
-      } finally {
-        if (!cancelled) syncedToken = token;
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  });
-
   async function handleLogout() {
     try {
       await deleteCurrentSessionHandler();
     } catch {
       // 忽略服务端退出失败，始终清理本地状态。
     }
-    auth.logout({ reason: "manual" });
-    await goto(resolve("/login"));
+    await authBootstrap.logoutAndRedirect();
   }
 
   function setThemeMode(nextMode: ThemeMode) {
@@ -190,11 +130,17 @@
 
     <div class="flex flex-1 flex-col p-4">
       <main class="flex-1">
-        {#key pathname}
-          <section class="route-enter">
-            {@render children()}
+        {#if authBootstrap.ensuringSession}
+          <section class="route-enter flex min-h-24 items-center">
+            <p class="text-muted-foreground text-sm">正在恢复会话...</p>
           </section>
-        {/key}
+        {:else}
+          {#key pathname}
+            <section class="route-enter">
+              {@render children()}
+            </section>
+          {/key}
+        {/if}
       </main>
     </div>
   </Sidebar.Inset>

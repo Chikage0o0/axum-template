@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { toast } from "svelte-sonner";
-  import { ApiError } from "$lib/api/mutator";
   import {
     getSettingsHandler,
     patchSettingsHandler,
@@ -9,16 +8,11 @@
     type SettingsResponse,
   } from "$lib/api/generated/client";
   import { PatchSettingsRequest as PatchSettingsRequestSchema } from "$lib/api/generated/schemas";
-  import {
-    detailsToFieldErrors,
-    hasFieldError,
-    mergeFieldErrors,
-    toFieldErrorItems,
-    type FieldErrors,
-    zodErrorToFieldErrors,
-  } from "$lib/shared/forms/field-errors";
+  import { useApiFormSubmit } from "$lib/shared/forms/use-api-form-submit.svelte";
+  import LoadStatePanel from "$lib/shared/components/load-state-panel.svelte";
+  import { type FieldErrors, zodErrorToFieldErrors } from "$lib/shared/forms/field-errors";
+  import { useFieldErrors } from "$lib/shared/forms/use-field-errors.svelte";
   import PasswordInput from "$lib/shared/components/password-input.svelte";
-  import * as Alert from "$lib/shadcn/components/ui/alert/index.js";
   import { Button } from "$lib/shadcn/components/ui/button/index.js";
   import * as Card from "$lib/shadcn/components/ui/card/index.js";
   import * as Field from "$lib/shadcn/components/ui/field/index.js";
@@ -33,7 +27,8 @@
   let welcomeMessage = $state("");
   let exampleApiBase = $state("");
   let exampleApiKey = $state("");
-  let settingsFieldErrors = $state<FieldErrors>({});
+  const apiSubmit = useApiFormSubmit();
+  const settingsFieldErrors = useFieldErrors<string>();
 
   async function reload() {
     error = null;
@@ -53,11 +48,11 @@
   }
 
   function invalidSettings(...keys: string[]): boolean {
-    return hasFieldError(settingsFieldErrors, ...keys);
+    return settingsFieldErrors.invalid(...keys);
   }
 
   function settingsErrorItems(...keys: string[]) {
-    return toFieldErrorItems(settingsFieldErrors, ...keys);
+    return settingsFieldErrors.items(...keys);
   }
 
   async function save() {
@@ -65,6 +60,7 @@
       toast.error("配置尚未加载");
       return;
     }
+    const currentSettings = settings;
 
     const localErrors: FieldErrors = {};
     const intervalRaw = checkIntervalSecs.trim();
@@ -90,63 +86,66 @@
     }
 
     if (Object.keys(localErrors).length > 0) {
-      settingsFieldErrors = localErrors;
+      settingsFieldErrors.setErrors(localErrors);
       return;
     }
 
-    settingsFieldErrors = {};
-    saving = true;
-    try {
-      const payload: PatchSettingsRequestDto = {};
-      const app: NonNullable<PatchSettingsRequestDto["app"]> = {};
-      const integrations: NonNullable<PatchSettingsRequestDto["integrations"]> = {};
+    settingsFieldErrors.clearErrors();
+    await apiSubmit.run(
+      async () => {
+        const payload: PatchSettingsRequestDto = {};
+        const app: NonNullable<PatchSettingsRequestDto["app"]> = {};
+        const integrations: NonNullable<PatchSettingsRequestDto["integrations"]> = {};
 
-      const interval = Math.trunc(intervalNum);
-      if (interval !== settings.app.check_interval_secs) app.check_interval_secs = interval;
+        const interval = Math.trunc(intervalNum);
+        if (interval !== currentSettings.app.check_interval_secs)
+          app.check_interval_secs = interval;
 
-      if (welcomeMessageTrimmed !== settings.app.welcome_message) {
-        app.welcome_message = welcomeMessageTrimmed;
-      }
+        if (welcomeMessageTrimmed !== currentSettings.app.welcome_message) {
+          app.welcome_message = welcomeMessageTrimmed;
+        }
 
-      if (apiBaseTrimmed !== settings.integrations.example_api_base) {
-        integrations.example_api_base = apiBaseTrimmed;
-      }
+        if (apiBaseTrimmed !== currentSettings.integrations.example_api_base) {
+          integrations.example_api_base = apiBaseTrimmed;
+        }
 
-      if (apiKeyTrimmed) integrations.example_api_key = apiKeyTrimmed;
+        if (apiKeyTrimmed) integrations.example_api_key = apiKeyTrimmed;
 
-      if (Object.keys(app).length) payload.app = app;
-      if (Object.keys(integrations).length) payload.integrations = integrations;
+        if (Object.keys(app).length) payload.app = app;
+        if (Object.keys(integrations).length) payload.integrations = integrations;
 
-      if (!Object.keys(payload).length) {
-        settingsFieldErrors = {};
-        return;
-      }
-
-      const payloadCheck = PatchSettingsRequestSchema.safeParse(payload);
-      if (!payloadCheck.success) {
-        settingsFieldErrors = zodErrorToFieldErrors(payloadCheck.error);
-        return;
-      }
-
-      const updated = await patchSettingsHandler(payload);
-      settings = updated;
-      checkIntervalSecs = String(updated.app.check_interval_secs);
-      welcomeMessage = updated.app.welcome_message;
-      exampleApiBase = updated.integrations.example_api_base;
-      exampleApiKey = "";
-      settingsFieldErrors = {};
-    } catch (e) {
-      if (e instanceof ApiError) {
-        const mapped = detailsToFieldErrors(e.body?.details);
-        settingsFieldErrors = mergeFieldErrors(settingsFieldErrors, mapped);
-        if (Object.keys(mapped).length > 0) {
+        if (!Object.keys(payload).length) {
+          settingsFieldErrors.clearErrors();
           return;
         }
-      }
-      toast.error(e instanceof Error ? e.message : "保存失败");
-    } finally {
-      saving = false;
-    }
+
+        const payloadCheck = PatchSettingsRequestSchema.safeParse(payload);
+        if (!payloadCheck.success) {
+          settingsFieldErrors.setErrors(zodErrorToFieldErrors(payloadCheck.error));
+          return;
+        }
+
+        const updated = await patchSettingsHandler(payload);
+        settings = updated;
+        checkIntervalSecs = String(updated.app.check_interval_secs);
+        welcomeMessage = updated.app.welcome_message;
+        exampleApiBase = updated.integrations.example_api_base;
+        exampleApiKey = "";
+        settingsFieldErrors.clearErrors();
+      },
+      {
+        setSubmitting(next) {
+          saving = next;
+        },
+        onFieldErrors(details) {
+          settingsFieldErrors.mergeApiDetails(details);
+          return Object.keys(settingsFieldErrors.errors).length > 0;
+        },
+        onUnknownError(error) {
+          toast.error(error instanceof Error ? error.message : "保存失败");
+        },
+      },
+    );
   }
 
   onMount(() => {
@@ -158,13 +157,6 @@
   <div>
     <h1 class="text-2xl font-semibold tracking-tight">设置</h1>
   </div>
-
-  {#if error}
-    <Alert.Root variant="destructive">
-      <Alert.Title>请求失败</Alert.Title>
-      <Alert.Description>{error}</Alert.Description>
-    </Alert.Root>
-  {/if}
 
   <Card.Root id="runtime">
     <Card.Header class="space-y-3">
@@ -183,7 +175,14 @@
       </div>
     </Card.Header>
     <Card.Content>
-      {#if settings}
+      <LoadStatePanel
+        {loading}
+        {error}
+        isEmpty={!settings}
+        onRetry={reload}
+        emptyTitle="尚未加载配置"
+        emptyDescription="请点击刷新重新加载配置。"
+      >
         <div class="grid gap-4 sm:grid-cols-2">
           <Field.Field
             data-invalid={invalidSettings("check_interval_secs", "app.check_interval_secs") ||
@@ -239,7 +238,7 @@
             <PasswordInput
               id="example_api_key"
               bind:value={exampleApiKey}
-              placeholder={settings.integrations.example_api_key_is_set ? "已设置" : "未设置"}
+              placeholder={settings?.integrations.example_api_key_is_set ? "已设置" : "未设置"}
               aria-invalid={invalidSettings("example_api_key", "integrations.example_api_key")}
             />
             <Field.Error
@@ -247,9 +246,7 @@
             />
           </Field.Field>
         </div>
-      {:else}
-        <p class="text-muted-foreground text-sm">尚未加载配置。</p>
-      {/if}
+      </LoadStatePanel>
     </Card.Content>
   </Card.Root>
 </div>

@@ -1,11 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { toast } from "svelte-sonner";
-  import EllipsisVerticalIcon from "@lucide/svelte/icons/ellipsis-vertical";
-  import PencilIcon from "@lucide/svelte/icons/pencil";
-  import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
-  import Trash2Icon from "@lucide/svelte/icons/trash-2";
-  import UserPlusIcon from "@lucide/svelte/icons/user-plus";
   import { ApiError } from "$lib/api/mutator";
   import {
     createUserHandler,
@@ -29,22 +24,23 @@
     zodErrorToFieldErrors,
   } from "$lib/shared/forms/field-errors";
   import { auth } from "$lib/features/auth/state/auth";
-  import * as Alert from "$lib/shadcn/components/ui/alert/index.js";
+  import { buildUserPatchPayload } from "$lib/features/auth/model/user-helpers";
   import * as AlertDialog from "$lib/shadcn/components/ui/alert-dialog/index.js";
   import { Badge } from "$lib/shadcn/components/ui/badge/index.js";
-  import { Button } from "$lib/shadcn/components/ui/button/index.js";
   import * as Card from "$lib/shadcn/components/ui/card/index.js";
-  import * as DropdownMenu from "$lib/shadcn/components/ui/dropdown-menu/index.js";
   import * as Empty from "$lib/shadcn/components/ui/empty/index.js";
   import * as Field from "$lib/shadcn/components/ui/field/index.js";
   import { Input } from "$lib/shadcn/components/ui/input/index.js";
   import * as Sheet from "$lib/shadcn/components/ui/sheet/index.js";
-  import { Skeleton } from "$lib/shadcn/components/ui/skeleton/index.js";
   import { Switch } from "$lib/shadcn/components/ui/switch/index.js";
   import * as Table from "$lib/shadcn/components/ui/table/index.js";
-  import * as Tooltip from "$lib/shadcn/components/ui/tooltip/index.js";
   import TruncateText from "$lib/shared/components/truncate-text.svelte";
+  import UserRowActions from "$lib/app/components/user-row-actions.svelte";
   import UserAvatar from "$lib/shared/components/user-avatar.svelte";
+  import FormDialogShell from "$lib/shared/components/form-dialog-shell.svelte";
+  import LoadStatePanel from "$lib/shared/components/load-state-panel.svelte";
+  import UserProfileFields from "$lib/shared/components/user-profile-fields.svelte";
+  import UsersToolbar from "$lib/app/components/users-toolbar.svelte";
 
   type SheetMode = "create" | "edit";
   type UserFormDraft = {
@@ -84,6 +80,7 @@
   let deleteTarget = $state<UserResponse | null>(null);
 
   const sheetTitle = $derived(sheetMode === "create" ? "新增用户" : "编辑用户");
+  const sheetSubmitLabel = $derived(sheetMode === "create" ? "创建用户" : "保存修改");
 
   function isSelfRow(userId: string): boolean {
     return $auth.user?.sub === userId;
@@ -173,48 +170,22 @@
       return { ok: false, message: "未找到要编辑的用户" };
     }
 
-    const payload: PatchUserRequest = {};
-    const usernameTrimmed = draft.username.trim();
-    const displayNameTrimmed = draft.display_name.trim();
-    const emailTrimmed = draft.email.trim();
-    const phoneTrimmed = draft.phone.trim();
-    const avatarUrlTrimmed = draft.avatar_url.trim();
-
-    if (!displayNameTrimmed) {
-      return {
-        ok: false,
-        message: "显示名称不能为空",
-        errors: { display_name: ["显示名称不能为空"] },
-      };
-    }
-    if (!emailTrimmed) {
-      return { ok: false, message: "邮箱不能为空", errors: { email: ["邮箱不能为空"] } };
+    const built = buildUserPatchPayload({
+      mode: "admin-edit",
+      current: selectedUser,
+      draft,
+    });
+    if (!built.ok) {
+      if (built.message.includes("display_name")) {
+        return { ok: false, message: built.message, errors: { display_name: [built.message] } };
+      }
+      if (built.message.includes("email")) {
+        return { ok: false, message: built.message, errors: { email: [built.message] } };
+      }
+      return { ok: false, message: built.message };
     }
 
-    if (usernameTrimmed !== (selectedUser.username ?? "")) {
-      payload.username = usernameTrimmed || null;
-    }
-    if (displayNameTrimmed !== selectedUser.display_name) {
-      payload.display_name = displayNameTrimmed;
-    }
-    if (emailTrimmed !== selectedUser.email) {
-      payload.email = emailTrimmed;
-    }
-    if (phoneTrimmed !== (selectedUser.phone ?? "")) {
-      payload.phone = phoneTrimmed || null;
-    }
-    if (avatarUrlTrimmed !== (selectedUser.avatar_url ?? "")) {
-      payload.avatar_url = avatarUrlTrimmed || null;
-    }
-    if (draft.is_active !== selectedUser.is_active) {
-      payload.is_active = draft.is_active;
-    }
-
-    if (Object.keys(payload).length === 0) {
-      return { ok: false, message: "没有可更新的字段" };
-    }
-
-    const check = PatchUserRequestSchema.safeParse(payload);
+    const check = PatchUserRequestSchema.safeParse(built.payload);
     if (!check.success) {
       return { ok: false, message: "表单校验失败", errors: zodErrorToFieldErrors(check.error) };
     }
@@ -314,16 +285,7 @@
   <!-- 页面标题栏 -->
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h1 class="text-2xl font-semibold tracking-tight">用户管理</h1>
-    <div class="flex items-center gap-2">
-      <Button variant="outline" disabled={listLoading} onclick={reloadUsers}>
-        <RefreshCwIcon class={`size-4 ${listLoading ? "animate-spin" : ""}`} />
-        {listLoading ? "刷新中..." : "刷新"}
-      </Button>
-      <Button onclick={openCreateSheet}>
-        <UserPlusIcon class="size-4" />
-        新增用户
-      </Button>
-    </div>
+    <UsersToolbar loading={listLoading} onRefresh={reloadUsers} onCreate={openCreateSheet} />
   </div>
 
   {#if permissionDenied}
@@ -334,13 +296,6 @@
       </Empty.Header>
     </Empty.Root>
   {:else}
-    {#if listError}
-      <Alert.Root variant="destructive">
-        <Alert.Title>请求失败</Alert.Title>
-        <Alert.Description>{listError}</Alert.Description>
-      </Alert.Root>
-    {/if}
-
     <Card.Root>
       <Card.Header class="space-y-2">
         <Card.Title>用户列表</Card.Title>
@@ -348,147 +303,79 @@
       </Card.Header>
 
       <Card.Content>
-        {#if listLoading}
-          <!-- 骨架屏加载态 -->
-          <div class="space-y-4">
-            {#each Array.from({ length: 5 }, (_, index) => index) as index (index)}
-              <div class="flex items-center gap-4">
-                <Skeleton class="size-8 rounded-full" />
-                <Skeleton class="h-4 w-24" />
-                <Skeleton class="h-4 w-20" />
-                <Skeleton class="h-4 w-36" />
-                <Skeleton class="h-5 w-12 rounded-full" />
-              </div>
-            {/each}
-          </div>
-        {:else if users.length === 0}
-          <Empty.Root class="min-h-44">
-            <Empty.Header>
-              <Empty.Title>暂无用户数据</Empty.Title>
-              <Empty.Description>可以先新增一个用户。</Empty.Description>
-            </Empty.Header>
-            <Empty.Content>
-              <Button onclick={openCreateSheet}>
-                <UserPlusIcon class="size-4" />
-                新增用户
-              </Button>
-            </Empty.Content>
-          </Empty.Root>
-        {:else}
-          <Tooltip.Provider>
-            <Table.Root class="table-fixed">
-              <Table.Header>
-                <Table.Row>
-                  <Table.Head class="w-[30%]">用户</Table.Head>
-                  <Table.Head class="w-[25%]">用户名</Table.Head>
-                  <Table.Head class="w-[25%]">邮箱</Table.Head>
-                  <Table.Head class="w-[10%]">状态</Table.Head>
-                  <Table.Head class="w-[10%]"></Table.Head>
-                </Table.Row>
-              </Table.Header>
+        <LoadStatePanel
+          loading={listLoading}
+          error={listError}
+          isEmpty={users.length === 0}
+          onRetry={reloadUsers}
+          onCreate={openCreateSheet}
+          emptyTitle="暂无用户数据"
+          emptyDescription="可以先新增一个用户。"
+          createLabel="新增用户"
+          loadingRows={5}
+        >
+          <Table.Root class="table-fixed">
+            <Table.Header>
+              <Table.Row>
+                <Table.Head class="w-[30%]">用户</Table.Head>
+                <Table.Head class="w-[25%]">用户名</Table.Head>
+                <Table.Head class="w-[25%]">邮箱</Table.Head>
+                <Table.Head class="w-[10%]">状态</Table.Head>
+                <Table.Head class="w-[10%]"></Table.Head>
+              </Table.Row>
+            </Table.Header>
 
-              <Table.Body>
-                {#each users as user (user.id)}
-                  <Table.Row class={isSelfRow(user.id) ? "bg-muted/40" : ""}>
-                    <!-- 头像 + 显示名称 -->
-                    <Table.Cell>
-                      <div class="flex items-center gap-3 min-w-0">
-                        <UserAvatar
-                          src={user.avatar_url ?? ""}
-                          alt={user.display_name}
-                          email={user.email}
-                          displayName={user.display_name}
-                          id={user.id}
-                        />
-                        <div class="flex flex-col min-w-0">
-                          <TruncateText
-                            text={user.display_name}
-                            class="font-medium leading-tight"
-                          />
-                          {#if isSelfRow(user.id)}
-                            <span class="text-muted-foreground text-xs">当前账号</span>
-                          {/if}
-                        </div>
+            <Table.Body>
+              {#each users as user (user.id)}
+                <Table.Row class={isSelfRow(user.id) ? "bg-muted/40" : ""}>
+                  <!-- 头像 + 显示名称 -->
+                  <Table.Cell>
+                    <div class="flex items-center gap-3 min-w-0">
+                      <UserAvatar
+                        src={user.avatar_url ?? ""}
+                        alt={user.display_name}
+                        email={user.email}
+                        displayName={user.display_name}
+                        id={user.id}
+                      />
+                      <div class="flex flex-col min-w-0">
+                        <TruncateText text={user.display_name} class="font-medium leading-tight" />
+                        {#if isSelfRow(user.id)}
+                          <span class="text-muted-foreground text-xs">当前账号</span>
+                        {/if}
                       </div>
-                    </Table.Cell>
-                    <Table.Cell class="text-muted-foreground">
-                      <TruncateText text={user.username ?? "-"} />
-                    </Table.Cell>
-                    <Table.Cell class="text-muted-foreground">
-                      <TruncateText text={user.email} />
-                    </Table.Cell>
-                    <Table.Cell>
-                      {#if user.is_active}
-                        <Badge
-                          class="border-emerald-600/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                          >启用</Badge
-                        >
-                      {:else}
-                        <Badge variant="destructive">禁用</Badge>
-                      {/if}
-                    </Table.Cell>
-                    <Table.Cell>
-                      <!-- 行操作下拉菜单 -->
-                      <DropdownMenu.Root>
-                        <DropdownMenu.Trigger>
-                          {#snippet child({ props })}
-                            <Button
-                              {...props}
-                              variant="ghost"
-                              size="icon"
-                              class="size-8"
-                              aria-label="操作菜单"
-                            >
-                              <EllipsisVerticalIcon class="size-4" />
-                            </Button>
-                          {/snippet}
-                        </DropdownMenu.Trigger>
-                        <DropdownMenu.Content align="end">
-                          <DropdownMenu.Item
-                            disabled={deletingUserId === user.id}
-                            onclick={() => openEditSheet(user)}
-                          >
-                            <PencilIcon class="size-4" />
-                            编辑
-                          </DropdownMenu.Item>
-                          <DropdownMenu.Separator />
-                          {#if isSelfRow(user.id)}
-                            <Tooltip.Provider>
-                              <Tooltip.Root>
-                                <Tooltip.Trigger>
-                                  {#snippet child({ props })}
-                                    <div {...props}>
-                                      <DropdownMenu.Item disabled>
-                                        <Trash2Icon class="size-4" />
-                                        删除
-                                      </DropdownMenu.Item>
-                                    </div>
-                                  {/snippet}
-                                </Tooltip.Trigger>
-                                <Tooltip.Content>
-                                  <p>当前登录账号不允许自删除</p>
-                                </Tooltip.Content>
-                              </Tooltip.Root>
-                            </Tooltip.Provider>
-                          {:else}
-                            <DropdownMenu.Item
-                              class="text-destructive focus:text-destructive"
-                              disabled={deletingUserId === user.id}
-                              onclick={() => requestDelete(user)}
-                            >
-                              <Trash2Icon class="size-4" />
-                              {deletingUserId === user.id ? "删除中..." : "删除"}
-                            </DropdownMenu.Item>
-                          {/if}
-                        </DropdownMenu.Content>
-                      </DropdownMenu.Root>
-                    </Table.Cell>
-                  </Table.Row>
-                {/each}
-              </Table.Body>
-            </Table.Root>
-          </Tooltip.Provider>
-        {/if}
+                    </div>
+                  </Table.Cell>
+                  <Table.Cell class="text-muted-foreground">
+                    <TruncateText text={user.username ?? "-"} />
+                  </Table.Cell>
+                  <Table.Cell class="text-muted-foreground">
+                    <TruncateText text={user.email} />
+                  </Table.Cell>
+                  <Table.Cell>
+                    {#if user.is_active}
+                      <Badge
+                        class="border-emerald-600/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                        >启用</Badge
+                      >
+                    {:else}
+                      <Badge variant="destructive">禁用</Badge>
+                    {/if}
+                  </Table.Cell>
+                  <Table.Cell>
+                    <UserRowActions
+                      row={user}
+                      currentUserId={$auth.user?.sub}
+                      {deletingUserId}
+                      onEdit={openEditSheet}
+                      onDelete={requestDelete}
+                    />
+                  </Table.Cell>
+                </Table.Row>
+              {/each}
+            </Table.Body>
+          </Table.Root>
+        </LoadStatePanel>
       </Card.Content>
     </Card.Root>
   {/if}
@@ -539,30 +426,12 @@
         void submitSheet();
       }}
     >
-      <Field.Field data-invalid={invalidSheet("display_name") || undefined}>
-        <Field.Label for="user_display_name">显示名称 *</Field.Label>
-        <Input
-          id="user_display_name"
-          placeholder="例如：张三"
-          bind:value={draft.display_name}
-          disabled={sheetSubmitting}
-          aria-invalid={invalidSheet("display_name")}
-        />
-        <Field.Error errors={sheetErrorItems("display_name")} />
-      </Field.Field>
-
-      <Field.Field data-invalid={invalidSheet("email") || undefined}>
-        <Field.Label for="user_email">邮箱 *</Field.Label>
-        <Input
-          id="user_email"
-          type="email"
-          placeholder="user@example.com"
-          bind:value={draft.email}
-          disabled={sheetSubmitting}
-          aria-invalid={invalidSheet("email")}
-        />
-        <Field.Error errors={sheetErrorItems("email")} />
-      </Field.Field>
+      <UserProfileFields
+        bind:draft
+        errors={sheetFieldErrors}
+        disabled={sheetSubmitting}
+        idPrefix="user"
+      />
 
       <Field.Field data-invalid={invalidSheet("username") || undefined}>
         <Field.Label for="user_username">用户名</Field.Label>
@@ -574,33 +443,6 @@
           aria-invalid={invalidSheet("username")}
         />
         <Field.Error errors={sheetErrorItems("username")} />
-      </Field.Field>
-
-      <Field.Field data-invalid={invalidSheet("phone") || undefined}>
-        <Field.Label for="user_phone">手机号</Field.Label>
-        <Input
-          id="user_phone"
-          placeholder="可选"
-          bind:value={draft.phone}
-          disabled={sheetSubmitting}
-          aria-invalid={invalidSheet("phone")}
-        />
-        <Field.Error errors={sheetErrorItems("phone")} />
-      </Field.Field>
-
-      <Field.Field
-        class="md:col-span-2 min-w-0"
-        data-invalid={invalidSheet("avatar_url") || undefined}
-      >
-        <Field.Label for="user_avatar_url">头像链接</Field.Label>
-        <Input
-          id="user_avatar_url"
-          placeholder="https://example.com/avatar.png"
-          bind:value={draft.avatar_url}
-          disabled={sheetSubmitting}
-          aria-invalid={invalidSheet("avatar_url")}
-        />
-        <Field.Error errors={sheetErrorItems("avatar_url")} />
       </Field.Field>
 
       {#if sheetMode === "edit"}
@@ -625,14 +467,12 @@
         </Field.Field>
       {/if}
 
-      <div class="md:col-span-2 flex justify-end gap-2 pt-1">
-        <Button type="button" variant="outline" disabled={sheetSubmitting} onclick={closeSheet}>
-          取消
-        </Button>
-        <Button type="submit" disabled={sheetSubmitting}>
-          {sheetSubmitting ? "保存中..." : sheetMode === "create" ? "创建用户" : "保存修改"}
-        </Button>
-      </div>
+      <FormDialogShell
+        submitting={sheetSubmitting}
+        submitLabel={sheetSubmitLabel}
+        submittingLabel="保存中..."
+        onCancel={closeSheet}
+      />
     </form>
   </Sheet.Content>
 </Sheet.Root>
