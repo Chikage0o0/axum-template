@@ -1,6 +1,7 @@
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
-import { getCurrentUserHandler, refreshSessionHandler } from "$lib/api/generated/client";
+import { getCurrentUserHandler } from "$lib/api/generated/client";
+import { refreshAccessToken } from "$lib/api/mutator";
 import { toAuthUser } from "$lib/features/auth/model/user-helpers";
 import { auth } from "$lib/features/auth/state/auth";
 import { fromStore } from "svelte/store";
@@ -24,9 +25,11 @@ export function useAuthBootstrap() {
 
     void (async () => {
       try {
-        const refreshed = await refreshSessionHandler();
+        const refreshedToken = await refreshAccessToken();
         if (cancelled) return;
-        auth.login(refreshed.token);
+        if (!refreshedToken) {
+          await logoutAndRedirect();
+        }
       } catch {
         if (cancelled) return;
         await logoutAndRedirect();

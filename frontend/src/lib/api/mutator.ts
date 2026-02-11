@@ -66,7 +66,7 @@ function buildHeaders(init: RequestInit, token: string | null): Headers {
   return headers;
 }
 
-async function refreshAccessToken(): Promise<string | null> {
+export async function refreshAccessToken(): Promise<string | null> {
   if (refreshingTokenPromise) {
     return refreshingTokenPromise;
   }

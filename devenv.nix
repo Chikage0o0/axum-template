@@ -24,6 +24,7 @@ in
     pkgs.pre-commit
     pkgs.bacon
     pkgs.taplo
+    pkgs.tokei
     pkgs.pgcli
     pkgs.go-task
   ];

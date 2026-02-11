@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { get } from "svelte/store";
 
 import { auth } from "$lib/features/auth/state/auth";
-import { ApiError, apiClient } from "./mutator";
+import { ApiError, apiClient, refreshAccessToken } from "./mutator";
 
 type MemoryStorage = {
   getItem: (key: string) => string | null;
@@ -161,5 +161,63 @@ describe("apiClient", () => {
     expect(data.ok).toBeTrue();
     expect(get(auth).isAuthenticated).toBeTrue();
     expect(get(auth).token).toBe("token-new");
+  });
+
+  it("并发刷新时应复用同一个 refresh 请求", async () => {
+    auth.login("token-old");
+
+    let settingsCalls = 0;
+    let refreshCalls = 0;
+
+    globalThis.fetch = async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+
+      if (url === "/api/v1/settings") {
+        settingsCalls += 1;
+        if (settingsCalls === 1) {
+          return new Response(
+            JSON.stringify({
+              code: 1001,
+              message: "身份验证失败: Token 无效或已过期",
+              request_id: "req_4",
+            }),
+            {
+              status: 401,
+              headers: { "content-type": "application/json" },
+            },
+          );
+        }
+
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      if (url === "/api/v1/sessions/refresh") {
+        refreshCalls += 1;
+        return new Response(
+          JSON.stringify({
+            token: `token-new-${refreshCalls}`,
+            expires_in: 900,
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        );
+      }
+
+      return new Response(null, { status: 404 });
+    };
+
+    const [settings, refreshedToken] = await Promise.all([
+      apiClient<{ ok: boolean }>("/api/v1/settings", { method: "GET" }),
+      refreshAccessToken(),
+    ]);
+
+    expect(settings.ok).toBeTrue();
+    expect(refreshedToken?.startsWith("token-new-")).toBeTrue();
+    expect(refreshCalls).toBe(1);
   });
 });
