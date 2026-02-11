@@ -112,7 +112,7 @@ mod tests {
     }
 
     #[test]
-    fn should_expose_session_username_schema() {
+    fn should_expose_session_identifier_schema() {
         let doc = ApiDoc::openapi();
         let schemas = doc.components.expect("openapi components 应存在").schemas;
         let session_schema = schemas
@@ -124,7 +124,7 @@ mod tests {
             _ => panic!("CreateSessionRequest schema 类型应为 object"),
         };
 
-        assert!(session_obj.properties.contains_key("username"));
+        assert!(session_obj.properties.contains_key("identifier"));
         assert!(session_obj.properties.contains_key("password"));
     }
 

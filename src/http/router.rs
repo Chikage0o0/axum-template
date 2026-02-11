@@ -319,7 +319,7 @@ SET value = EXCLUDED.value,
 
     async fn login_and_get_tokens(
         server: &TestServer,
-        username: &str,
+        identifier: &str,
         password: &str,
     ) -> (String, String) {
         let response = request_json(
@@ -329,7 +329,7 @@ SET value = EXCLUDED.value,
             None,
             None,
             Some(serde_json::json!({
-                "username": username,
+                "identifier": identifier,
                 "password": password,
             })),
         )

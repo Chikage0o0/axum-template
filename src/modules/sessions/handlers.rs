@@ -30,7 +30,7 @@ struct SessionIssueContext {
     user_id: Uuid,
     auth_version: i32,
     session_id: Uuid,
-    username: String,
+    username: Option<String>,
     display_name: String,
     email: String,
     refresh_secret: String,
@@ -38,10 +38,10 @@ struct SessionIssueContext {
 
 #[derive(Debug, Deserialize, ToSchema, Validate)]
 pub struct CreateSessionRequest {
-    #[schema(min_length = 1, max_length = 64)]
+    #[schema(min_length = 1, max_length = 320)]
     #[serde(deserialize_with = "crate::api::serde_helpers::deserialize_trimmed_string")]
-    #[garde(length(min = 1, max = 64))]
-    pub username: String,
+    #[garde(length(min = 1, max = 320))]
+    pub identifier: String,
 
     #[schema(format = "password", min_length = 1, max_length = 256)]
     #[serde(deserialize_with = "crate::api::serde_helpers::deserialize_trimmed_string")]
@@ -75,7 +75,7 @@ pub async fn create_session_handler(
 ) -> Result<impl IntoResponse, AppError> {
     let cfg = state.config.load_full();
 
-    let user = load_login_user(&state, &payload.username).await?;
+    let user = load_login_user(&state, &payload.identifier).await?;
     if !user.is_active {
         return Err(AppError::auth_credential("用户名或密码错误"));
     }
@@ -134,7 +134,7 @@ VALUES ($1, $2, $3, $4, NULL, NULL)
         user_id: user.id,
         auth_version: user.auth_version,
         session_id,
-        username: payload.username,
+        username: user.username,
         display_name: user.display_name,
         email: user.email,
         refresh_secret,
@@ -271,10 +271,10 @@ fn build_login_or_refresh_response(
         sub: ctx.user_id.to_string(),
         sid: ctx.session_id.to_string(),
         ver: ctx.auth_version,
-        username: Some(ctx.username.clone()),
+        username: ctx.username.clone(),
         display_name: Some(ctx.display_name),
         email: Some(ctx.email),
-        role: if ctx.username == "admin" {
+        role: if ctx.username.as_deref() == Some("admin") {
             "admin".to_string()
         } else {
             "user".to_string()
@@ -391,6 +391,7 @@ fn extract_cookie_value(cookie_header: &str, name: &str) -> Option<String> {
 #[derive(Debug, FromRow)]
 struct LoginUserRow {
     id: Uuid,
+    username: Option<String>,
     display_name: String,
     email: String,
     password_hash: Option<String>,
@@ -398,28 +399,37 @@ struct LoginUserRow {
     auth_version: i32,
 }
 
-async fn load_login_user(state: &AppState, username: &str) -> Result<LoginUserRow, AppError> {
-    let user = sqlx::query_as!(
+async fn load_login_user(state: &AppState, identifier: &str) -> Result<LoginUserRow, AppError> {
+    let mut users = sqlx::query_as!(
         LoginUserRow,
         r#"
-SELECT id, display_name, email, password_hash, is_active, auth_version
+SELECT id, username, display_name, email, password_hash, is_active, auth_version
 FROM users
-WHERE username = $1
-LIMIT 1
+WHERE deleted_at IS NULL
+  AND (
+    username = $1
+    OR email = $1
+    OR phone = $1
+  )
+LIMIT 2
         "#,
-        username,
+        identifier,
     )
-    .fetch_optional(&state.db)
+    .fetch_all(&state.db)
     .await
     .map_err(|e| AppError::InternalError(format!("查询登录用户失败: {e}")))?;
 
-    user.ok_or_else(|| AppError::auth_credential("用户名或密码错误"))
+    if users.len() != 1 {
+        return Err(AppError::auth_credential("用户名或密码错误"));
+    }
+
+    Ok(users.remove(0))
 }
 
 #[derive(Debug, FromRow)]
 struct AuthSessionRow {
     user_id: Uuid,
-    username: String,
+    username: Option<String>,
     display_name: String,
     email: String,
     user_is_active: bool,
@@ -435,7 +445,7 @@ async fn load_auth_session(state: &AppState, session_id: Uuid) -> Result<AuthSes
         r#"
 SELECT
     s.user_id,
-    u.username AS "username!",
+    u.username,
     u.display_name,
     u.email,
     u.is_active AS user_is_active,

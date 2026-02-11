@@ -54,6 +54,7 @@ pub struct CreateUserRequest {
         deserialize_with = "crate::api::serde_helpers::deserialize_opt_trimmed_string"
     )]
     #[garde(custom(crate::api::garde_helpers::opt_string_trim_non_empty))]
+    #[garde(custom(crate::api::garde_helpers::opt_username_format))]
     #[garde(length(max = 64))]
     pub username: Option<String>,
 
@@ -103,6 +104,7 @@ pub struct PatchUserRequest {
         deserialize_with = "crate::api::serde_helpers::deserialize_opt_trimmed_string"
     )]
     #[garde(custom(crate::api::garde_helpers::opt_string_trim_non_empty))]
+    #[garde(custom(crate::api::garde_helpers::opt_username_format))]
     #[garde(length(max = 64))]
     pub username: Option<String>,
 
@@ -617,6 +619,10 @@ LIMIT 1
 }
 
 async fn create_user(db: &DbPool, payload: CreateUserRequest) -> Result<UserResponse, AppError> {
+    if let Some(username) = payload.username.as_deref() {
+        ensure_username_not_conflicts_with_other_user_contacts(db, username, None).await?;
+    }
+
     let mut tx = db
         .begin()
         .await
@@ -696,6 +702,10 @@ async fn patch_user(
         && payload.metadata.is_none()
     {
         return Err(AppError::validation("至少需要提供一个可更新字段"));
+    }
+
+    if let Some(username) = payload.username.as_deref() {
+        ensure_username_not_conflicts_with_other_user_contacts(db, username, Some(user_id)).await?;
     }
 
     let row = sqlx::query_as!(
@@ -1013,6 +1023,37 @@ fn validate_identity_semantics(identity: &CreateUserIdentityRequest) -> Result<(
 
 fn normalize_provider_segment(input: &str) -> String {
     input.trim().to_ascii_lowercase()
+}
+
+async fn ensure_username_not_conflicts_with_other_user_contacts(
+    db: &DbPool,
+    username: &str,
+    exclude_user_id: Option<Uuid>,
+) -> Result<(), AppError> {
+    let conflict = sqlx::query!(
+        r#"
+SELECT EXISTS (
+    SELECT 1
+    FROM users
+    WHERE deleted_at IS NULL
+      AND ($2::uuid IS NULL OR id <> $2)
+      AND (email = $1 OR phone = $1)
+) AS "exists!"
+        "#,
+        username,
+        exclude_user_id,
+    )
+    .fetch_one(db)
+    .await
+    .map_err(|e| AppError::InternalError(format!("检查用户名冲突失败: {e}")))?;
+
+    if conflict.exists {
+        return Err(AppError::validation(
+            "用户名不能与其他用户的邮箱或手机号相同",
+        ));
+    }
+
+    Ok(())
 }
 
 fn map_user_db_error(prefix: &str, err: sqlx::Error) -> AppError {

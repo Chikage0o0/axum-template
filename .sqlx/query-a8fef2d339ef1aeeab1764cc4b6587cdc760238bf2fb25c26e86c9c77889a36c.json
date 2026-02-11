@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\nSELECT\n    s.user_id,\n    u.username AS \"username!\",\n    u.display_name,\n    u.email,\n    u.is_active AS user_is_active,\n    u.auth_version,\n    s.refresh_secret_hash,\n    s.expires_at,\n    s.revoked_at\nFROM auth_sessions s\nINNER JOIN users u ON u.id = s.user_id\nWHERE s.id = $1\nLIMIT 1\n        ",
+  "query": "\nSELECT\n    s.user_id,\n    u.username,\n    u.display_name,\n    u.email,\n    u.is_active AS user_is_active,\n    u.auth_version,\n    s.refresh_secret_hash,\n    s.expires_at,\n    s.revoked_at\nFROM auth_sessions s\nINNER JOIN users u ON u.id = s.user_id\nWHERE s.id = $1\nLIMIT 1\n        ",
   "describe": {
     "columns": [
       {
@@ -10,7 +10,7 @@
       },
       {
         "ordinal": 1,
-        "name": "username!",
+        "name": "username",
         "type_info": "Varchar"
       },
       {
@@ -66,5 +66,5 @@
       true
     ]
   },
-  "hash": "eb97682f4991172dac4a5b9b93df49c8fbf9f0bee444eeac235125500ceb16bb"
+  "hash": "a8fef2d339ef1aeeab1764cc4b6587cdc760238bf2fb25c26e86c9c77889a36c"
 }

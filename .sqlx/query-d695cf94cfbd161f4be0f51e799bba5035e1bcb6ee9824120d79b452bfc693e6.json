@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\nSELECT EXISTS (\n    SELECT 1\n    FROM users\n    WHERE deleted_at IS NULL\n      AND ($2::uuid IS NULL OR id <> $2)\n      AND (email = $1 OR phone = $1)\n) AS \"exists!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exists!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "d695cf94cfbd161f4be0f51e799bba5035e1bcb6ee9824120d79b452bfc693e6"
+}

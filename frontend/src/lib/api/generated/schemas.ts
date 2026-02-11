@@ -18,7 +18,7 @@ export const ErrorResponseBody = z
   })
   .passthrough();
 export const CreateSessionRequest = z
-  .object({ password: z.string().min(1).max(256), username: z.string().min(1).max(64) })
+  .object({ identifier: z.string().min(1).max(320), password: z.string().min(1).max(256) })
   .passthrough();
 export const CreateSessionResponse = z
   .object({ expires_in: z.number().int().gte(0), token: z.string() })

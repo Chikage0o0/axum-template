@@ -20,7 +20,7 @@
   import * as Field from "$lib/shadcn/components/ui/field/index.js";
   import { Input } from "$lib/shadcn/components/ui/input/index.js";
 
-  let username = $state("");
+  let identifier = $state("");
   let password = $state("");
   let submitting = $state(false);
   let fieldErrors = $state<FieldErrors>({});
@@ -34,10 +34,10 @@
   }
 
   async function submit() {
-    const u = username.trim();
+    const i = identifier.trim();
     const p = password.trim();
 
-    const parsed = CreateSessionRequest.safeParse({ username: u, password: p });
+    const parsed = CreateSessionRequest.safeParse({ identifier: i, password: p });
     if (!parsed.success) {
       fieldErrors = zodErrorToFieldErrors(parsed.error);
       return;
@@ -47,13 +47,13 @@
 
     submitting = true;
     try {
-      const res = await createSessionHandler({ username: u, password: p });
+      const res = await createSessionHandler({ identifier: i, password: p });
       auth.login(res.token);
       await goto(resolve("/settings"));
     } catch (e) {
       if (e instanceof ApiError) {
         fieldErrors = mergeFieldErrors(fieldErrors, detailsToFieldErrors(e.body?.details));
-        if (invalid("username", "password")) {
+        if (invalid("identifier", "password")) {
           return;
         }
       }
@@ -77,16 +77,16 @@
         void submit();
       }}
     >
-      <Field.Field data-invalid={invalid("username") || undefined}>
-        <Field.Label for="username">用户名</Field.Label>
+      <Field.Field data-invalid={invalid("identifier") || undefined}>
+        <Field.Label for="identifier">账号（邮箱/用户名/手机号）</Field.Label>
         <Input
-          id="username"
-          bind:value={username}
+          id="identifier"
+          bind:value={identifier}
           autocomplete="username"
           disabled={submitting}
-          aria-invalid={invalid("username")}
+          aria-invalid={invalid("identifier")}
         />
-        <Field.Error errors={errorItems("username")} />
+        <Field.Error errors={errorItems("identifier")} />
       </Field.Field>
 
       <Field.Field data-invalid={invalid("password") || undefined}>

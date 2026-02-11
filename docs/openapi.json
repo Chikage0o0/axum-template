@@ -892,19 +892,19 @@
       "CreateSessionRequest": {
         "type": "object",
         "required": [
-          "username",
+          "identifier",
           "password"
         ],
         "properties": {
+          "identifier": {
+            "type": "string",
+            "maxLength": 320,
+            "minLength": 1
+          },
           "password": {
             "type": "string",
             "format": "password",
             "maxLength": 256,
-            "minLength": 1
-          },
-          "username": {
-            "type": "string",
-            "maxLength": 64,
             "minLength": 1
           }
         }

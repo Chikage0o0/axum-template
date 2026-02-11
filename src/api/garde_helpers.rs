@@ -47,3 +47,27 @@ pub fn opt_string_basic_email(v: &Option<String>, _ctx: &()) -> garde::Result {
     }
     Ok(())
 }
+
+pub fn opt_username_format(v: &Option<String>, _ctx: &()) -> garde::Result {
+    let Some(username) = v else {
+        return Ok(());
+    };
+
+    let username = username.trim();
+    if username.contains('@') {
+        return Err(garde::Error::new("用户名不能包含 @"));
+    }
+
+    if !username.chars().any(|c| c.is_ascii_alphabetic()) {
+        return Err(garde::Error::new("用户名必须包含字母"));
+    }
+
+    if !username
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    {
+        return Err(garde::Error::new("用户名只能包含字母、数字或下划线"));
+    }
+
+    Ok(())
+}

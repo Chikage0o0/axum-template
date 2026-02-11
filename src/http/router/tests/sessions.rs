@@ -73,3 +73,51 @@ async fn session_refresh_and_logout_should_revoke_current_session(pool: sqlx::Pg
 
     cleanup_test_users(&pool, &[user_id]).await;
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn session_login_should_accept_username_email_and_phone_identifier(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let username = format!("multi_login_user_{}", Uuid::new_v4().simple());
+    let email = format!("{username}@example.invalid");
+    let phone = format!("138{:08}", Uuid::new_v4().as_u128() % 100_000_000);
+    let password = "IdentifierPassword#A123";
+    let user_id = create_or_update_user_with_password(&pool, &username, &email, password).await;
+
+    sqlx::query!("UPDATE users SET phone = $2 WHERE id = $1", user_id, phone)
+        .execute(&pool)
+        .await
+        .expect("写入测试手机号失败");
+
+    for identifier in [&username, &email, &phone] {
+        let login_response = request_json(
+            &server,
+            Method::POST,
+            "/api/v1/sessions",
+            None,
+            None,
+            Some(serde_json::json!({
+                "identifier": identifier,
+                "password": password,
+            })),
+        )
+        .await;
+
+        assert_eq!(
+            login_response.status_code(),
+            StatusCode::OK,
+            "identifier={identifier} 应可登录"
+        );
+
+        let body = login_response.json::<Value>();
+        assert!(
+            body.get("token")
+                .and_then(Value::as_str)
+                .map(|v| !v.is_empty())
+                .unwrap_or(false),
+            "登录响应应包含 token"
+        );
+    }
+
+    cleanup_test_users(&pool, &[user_id]).await;
+}

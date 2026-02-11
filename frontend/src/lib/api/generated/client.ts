@@ -15,14 +15,14 @@ export interface AppSettings {
 export interface CreateSessionRequest {
   /**
    * @minLength 1
+   * @maxLength 320
+   */
+  identifier: string;
+  /**
+   * @minLength 1
    * @maxLength 256
    */
   password: string;
-  /**
-   * @minLength 1
-   * @maxLength 64
-   */
-  username: string;
 }
 
 export interface CreateSessionResponse {

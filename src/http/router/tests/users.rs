@@ -237,3 +237,162 @@ async fn restore_user_should_reactivate_soft_deleted_user(pool: sqlx::PgPool) {
 
     cleanup_test_users(&pool, &[user_id]).await;
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn username_should_not_conflict_with_other_user_email_or_phone(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let admin_password = "AdminPassword#A123";
+    ensure_admin_user_with_password(&pool, admin_password).await;
+
+    let owner_username = format!("owner_user_{}", Uuid::new_v4().simple());
+    let owner_email = format!("{owner_username}@example.invalid");
+    let owner_phone = format!("139{:08}", Uuid::new_v4().as_u128() % 100_000_000);
+    let owner_id =
+        create_or_update_user_with_password(&pool, &owner_username, &owner_email, "OwnerPwd#A123")
+            .await;
+    sqlx::query!(
+        "UPDATE users SET phone = $2 WHERE id = $1",
+        owner_id,
+        owner_phone
+    )
+    .execute(&pool)
+    .await
+    .expect("写入 owner 手机号失败");
+
+    let patch_target_username = format!("patch_target_{}", Uuid::new_v4().simple());
+    let patch_target_email = format!("{patch_target_username}@example.invalid");
+    let patch_target_id = create_or_update_user_with_password(
+        &pool,
+        &patch_target_username,
+        &patch_target_email,
+        "PatchTargetPwd#A123",
+    )
+    .await;
+
+    let (admin_token, _) = login_and_get_tokens(&server, "admin", admin_password).await;
+
+    let create_with_email_username = request_json(
+        &server,
+        Method::POST,
+        "/api/v1/users",
+        Some(&admin_token),
+        None,
+        Some(json!({
+            "username": owner_email,
+            "display_name": "conflict-email-username",
+            "email": format!("new_email_{}@example.invalid", Uuid::new_v4().simple()),
+        })),
+    )
+    .await;
+    assert_eq!(
+        create_with_email_username.status_code(),
+        StatusCode::BAD_REQUEST
+    );
+    let create_email_error = create_with_email_username.json::<Value>();
+    assert_eq!(
+        create_email_error.get("code").and_then(Value::as_u64),
+        Some(1000)
+    );
+
+    let create_with_phone_username = request_json(
+        &server,
+        Method::POST,
+        "/api/v1/users",
+        Some(&admin_token),
+        None,
+        Some(json!({
+            "username": owner_phone,
+            "display_name": "conflict-phone-username",
+            "email": format!("new_phone_email_{}@example.invalid", Uuid::new_v4().simple()),
+        })),
+    )
+    .await;
+    assert_eq!(
+        create_with_phone_username.status_code(),
+        StatusCode::BAD_REQUEST
+    );
+    let create_phone_error = create_with_phone_username.json::<Value>();
+    assert_eq!(
+        create_phone_error.get("code").and_then(Value::as_u64),
+        Some(1000)
+    );
+
+    let patch_conflict = request_json(
+        &server,
+        Method::PATCH,
+        &format!("/api/v1/users/{patch_target_id}"),
+        Some(&admin_token),
+        None,
+        Some(json!({
+            "username": owner_email,
+        })),
+    )
+    .await;
+    assert_eq!(patch_conflict.status_code(), StatusCode::BAD_REQUEST);
+    let patch_error = patch_conflict.json::<Value>();
+    assert_eq!(patch_error.get("code").and_then(Value::as_u64), Some(1000));
+
+    cleanup_test_users(&pool, &[owner_id, patch_target_id]).await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn username_should_reject_special_symbols_and_require_letters(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let admin_password = "AdminPassword#A123";
+    ensure_admin_user_with_password(&pool, admin_password).await;
+    let (admin_token, _) = login_and_get_tokens(&server, "admin", admin_password).await;
+
+    let invalid_usernames = ["12345678", "alice@demo", "alice-001", "alice#001"];
+    let mut created_ids = Vec::new();
+
+    for username in invalid_usernames {
+        let response = request_json(
+            &server,
+            Method::POST,
+            "/api/v1/users",
+            Some(&admin_token),
+            None,
+            Some(json!({
+                "username": username,
+                "display_name": format!("display-{username}"),
+                "email": format!("u_{}@example.invalid", Uuid::new_v4().simple()),
+            })),
+        )
+        .await;
+
+        assert_eq!(
+            response.status_code(),
+            StatusCode::BAD_REQUEST,
+            "username={username} 应被拒绝"
+        );
+        let body = response.json::<Value>();
+        assert_eq!(body.get("code").and_then(Value::as_u64), Some(1000));
+    }
+
+    let valid_response = request_json(
+        &server,
+        Method::POST,
+        "/api/v1/users",
+        Some(&admin_token),
+        None,
+        Some(json!({
+            "username": "alice_001",
+            "display_name": "valid-user",
+            "email": format!("valid_{}@example.invalid", Uuid::new_v4().simple()),
+        })),
+    )
+    .await;
+    assert_eq!(valid_response.status_code(), StatusCode::CREATED);
+    let valid_body = valid_response.json::<Value>();
+    if let Some(id) = valid_body
+        .get("id")
+        .and_then(Value::as_str)
+        .and_then(|id| Uuid::parse_str(id).ok())
+    {
+        created_ids.push(id);
+    }
+
+    cleanup_test_users(&pool, &created_ids).await;
+}

@@ -39,7 +39,7 @@
 请求示例：
 
 ```json
-{ "username": "admin", "password": "..." }
+{ "identifier": "admin", "password": "..." }
 ```
 
 响应示例：
@@ -50,6 +50,7 @@
 
 说明：
 
+- `identifier` 支持 `邮箱`、`用户名`、`手机号`
 - `expires_in` 固定为 15 分钟（`900` 秒）
 - 响应会通过 `Set-Cookie` 写入 HttpOnly `refresh_token`（有效期 30 天）
 
@@ -172,6 +173,8 @@
 说明：
 
 - `username` 为可选字段；仅外部身份登录场景可不填
+- 若提供 `username`，其值不能与其他未删除用户的 `email` 或 `phone` 相同
+- `username` 只能包含字母、数字、下划线，且必须至少包含一个字母，不能包含 `@`
 - `identities` 支持多 provider（如 `oidc/google`、`oauth2/github`）
 - 同一用户内，`provider_kind + provider_name` 不能重复
 - 若提供 `oidc_subject`，必须同时提供 `oidc_issuer`
@@ -181,6 +184,8 @@
 `PATCH /api/v1/users/{user_id}`
 
 支持按需更新：`username`、`display_name`、`email`、`phone`、`avatar_url`、`is_active`、`metadata`。
+
+其中 `username` 更新时同样受限：不能与其他未删除用户的 `email` 或 `phone` 相同，且格式规则与创建一致。
 
 注意：至少需要提供一个可更新字段，否则返回参数错误。
 
