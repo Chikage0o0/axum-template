@@ -29,6 +29,7 @@
     zodErrorToFieldErrors,
   } from "$lib/shared/forms/field-errors";
   import { auth } from "$lib/features/auth/state/auth";
+  import { buildUserPatchPayload } from "$lib/features/auth/model/user-helpers";
   import * as Alert from "$lib/shadcn/components/ui/alert/index.js";
   import * as AlertDialog from "$lib/shadcn/components/ui/alert-dialog/index.js";
   import { Badge } from "$lib/shadcn/components/ui/badge/index.js";
@@ -173,48 +174,22 @@
       return { ok: false, message: "未找到要编辑的用户" };
     }
 
-    const payload: PatchUserRequest = {};
-    const usernameTrimmed = draft.username.trim();
-    const displayNameTrimmed = draft.display_name.trim();
-    const emailTrimmed = draft.email.trim();
-    const phoneTrimmed = draft.phone.trim();
-    const avatarUrlTrimmed = draft.avatar_url.trim();
-
-    if (!displayNameTrimmed) {
-      return {
-        ok: false,
-        message: "显示名称不能为空",
-        errors: { display_name: ["显示名称不能为空"] },
-      };
-    }
-    if (!emailTrimmed) {
-      return { ok: false, message: "邮箱不能为空", errors: { email: ["邮箱不能为空"] } };
+    const built = buildUserPatchPayload({
+      mode: "admin-edit",
+      current: selectedUser,
+      draft,
+    });
+    if (!built.ok) {
+      if (built.message.includes("display_name")) {
+        return { ok: false, message: built.message, errors: { display_name: [built.message] } };
+      }
+      if (built.message.includes("email")) {
+        return { ok: false, message: built.message, errors: { email: [built.message] } };
+      }
+      return { ok: false, message: built.message };
     }
 
-    if (usernameTrimmed !== (selectedUser.username ?? "")) {
-      payload.username = usernameTrimmed || null;
-    }
-    if (displayNameTrimmed !== selectedUser.display_name) {
-      payload.display_name = displayNameTrimmed;
-    }
-    if (emailTrimmed !== selectedUser.email) {
-      payload.email = emailTrimmed;
-    }
-    if (phoneTrimmed !== (selectedUser.phone ?? "")) {
-      payload.phone = phoneTrimmed || null;
-    }
-    if (avatarUrlTrimmed !== (selectedUser.avatar_url ?? "")) {
-      payload.avatar_url = avatarUrlTrimmed || null;
-    }
-    if (draft.is_active !== selectedUser.is_active) {
-      payload.is_active = draft.is_active;
-    }
-
-    if (Object.keys(payload).length === 0) {
-      return { ok: false, message: "没有可更新的字段" };
-    }
-
-    const check = PatchUserRequestSchema.safeParse(payload);
+    const check = PatchUserRequestSchema.safeParse(built.payload);
     if (!check.success) {
       return { ok: false, message: "表单校验失败", errors: zodErrorToFieldErrors(check.error) };
     }

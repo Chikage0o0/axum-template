@@ -26,7 +26,7 @@
   import { validatePasswordChangeForm } from "$lib/shared/forms/password-change";
   import { auth } from "$lib/features/auth/state/auth";
   import {
-    buildCurrentUserPatchPayload,
+    buildUserPatchPayload,
     toAuthUser,
     type CurrentUserDraft,
   } from "$lib/features/auth/model/user-helpers";
@@ -154,7 +154,11 @@
       return;
     }
 
-    const result = buildCurrentUserPatchPayload(userToUpdate, currentUserDraft);
+    const result = buildUserPatchPayload({
+      mode: "self-edit",
+      current: userToUpdate,
+      draft: currentUserDraft,
+    });
     if (!result.ok) {
       if (result.message.includes("display_name")) {
         profileFieldErrors = { display_name: [result.message] };

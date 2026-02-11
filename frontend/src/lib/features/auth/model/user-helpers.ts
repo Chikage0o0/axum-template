@@ -25,17 +25,34 @@ export type CurrentUserDraft = {
   avatar_url: string;
 };
 
-export function buildPatchUserPayload(
-  current: EditableUserCurrent,
-  draft: EditableUserDraft,
-): { ok: true; payload: PatchUserRequest } | { ok: false; message: string } {
+type AdminEditableUserCurrent = EditableUserCurrent & Pick<User, "is_active">;
+type AdminEditableUserDraft = EditableUserDraft & Pick<User, "is_active">;
+
+type BuildUserPatchPayloadInput =
+  | {
+      mode: "admin-edit";
+      current: AdminEditableUserCurrent;
+      draft: AdminEditableUserDraft;
+    }
+  | {
+      mode: "self-edit";
+      current: CurrentUserEditable;
+      draft: CurrentUserDraft;
+    };
+
+type BuildUserPatchPayloadResult =
+  | { ok: true; payload: PatchUserRequest }
+  | { ok: false; message: string };
+
+export function buildUserPatchPayload(
+  input: BuildUserPatchPayloadInput,
+): BuildUserPatchPayloadResult {
   const payload: PatchUserRequest = {};
 
-  const username = draft.username.trim();
-  const displayName = draft.display_name.trim();
-  const email = draft.email.trim();
-  const phone = draft.phone.trim();
-  const avatarUrl = draft.avatar_url.trim();
+  const displayName = input.draft.display_name.trim();
+  const email = input.draft.email.trim();
+  const phone = input.draft.phone.trim();
+  const avatarUrl = input.draft.avatar_url.trim();
 
   if (!displayName) {
     return { ok: false, message: "display_name 不能为空" };
@@ -44,20 +61,32 @@ export function buildPatchUserPayload(
     return { ok: false, message: "email 格式不合法" };
   }
 
-  if (username && username !== (current.username ?? "")) {
-    payload.username = username;
-  }
-  if (displayName !== current.display_name) {
+  if (displayName !== input.current.display_name) {
     payload.display_name = displayName;
   }
-  if (email !== current.email) {
+  if (email !== input.current.email) {
     payload.email = email;
   }
-  if (phone && phone !== (current.phone ?? "")) {
-    payload.phone = phone;
+
+  const nextPhone = normalizeOptionalPatchField(phone, input.current.phone);
+  if (typeof nextPhone !== "undefined") {
+    payload.phone = nextPhone;
   }
-  if (avatarUrl && avatarUrl !== (current.avatar_url ?? "")) {
-    payload.avatar_url = avatarUrl;
+
+  const nextAvatarUrl = normalizeOptionalPatchField(avatarUrl, input.current.avatar_url);
+  if (typeof nextAvatarUrl !== "undefined") {
+    payload.avatar_url = nextAvatarUrl;
+  }
+
+  if (input.mode === "admin-edit") {
+    const username = input.draft.username.trim();
+    const nextUsername = normalizeOptionalPatchField(username, input.current.username);
+    if (typeof nextUsername !== "undefined") {
+      payload.username = nextUsername;
+    }
+    if (input.draft.is_active !== input.current.is_active) {
+      payload.is_active = input.draft.is_active;
+    }
   }
 
   if (Object.keys(payload).length === 0) {
@@ -67,42 +96,29 @@ export function buildPatchUserPayload(
   return { ok: true, payload };
 }
 
+export function buildPatchUserPayload(
+  current: EditableUserCurrent,
+  draft: EditableUserDraft,
+): { ok: true; payload: PatchUserRequest } | { ok: false; message: string } {
+  const result = buildUserPatchPayload({
+    mode: "admin-edit",
+    current: {
+      ...current,
+      is_active: true,
+    },
+    draft: {
+      ...draft,
+      is_active: true,
+    },
+  });
+  return result;
+}
+
 export function buildCurrentUserPatchPayload(
   current: CurrentUserEditable,
   draft: CurrentUserDraft,
 ): { ok: true; payload: PatchUserRequest } | { ok: false; message: string } {
-  const payload: PatchUserRequest = {};
-
-  const displayName = draft.display_name.trim();
-  const email = draft.email.trim();
-  const phone = draft.phone.trim();
-  const avatarUrl = draft.avatar_url.trim();
-
-  if (!displayName) {
-    return { ok: false, message: "display_name 不能为空" };
-  }
-  if (!isEmail(email)) {
-    return { ok: false, message: "email 格式不合法" };
-  }
-
-  if (displayName !== current.display_name) {
-    payload.display_name = displayName;
-  }
-  if (email !== current.email) {
-    payload.email = email;
-  }
-  if (phone && phone !== (current.phone ?? "")) {
-    payload.phone = phone;
-  }
-  if (avatarUrl && avatarUrl !== (current.avatar_url ?? "")) {
-    payload.avatar_url = avatarUrl;
-  }
-
-  if (Object.keys(payload).length === 0) {
-    return { ok: false, message: "没有可更新的字段" };
-  }
-
-  return { ok: true, payload };
+  return buildUserPatchPayload({ mode: "self-edit", current, draft });
 }
 
 export function toAuthUser(
@@ -122,4 +138,18 @@ function isEmail(input: string): boolean {
   const at = value.indexOf("@");
   if (at <= 0 || at >= value.length - 1) return false;
   return value.slice(at + 1).includes(".");
+}
+
+function normalizeOptionalPatchField(
+  draftValue: string,
+  currentValue: string | null | undefined,
+): string | null | undefined {
+  const current = currentValue?.trim() ?? "";
+  if (draftValue === current) {
+    return undefined;
+  }
+  if (!draftValue) {
+    return null;
+  }
+  return draftValue;
 }
