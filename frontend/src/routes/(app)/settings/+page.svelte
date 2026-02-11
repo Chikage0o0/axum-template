@@ -9,14 +9,8 @@
     type SettingsResponse,
   } from "$lib/api/generated/client";
   import { PatchSettingsRequest as PatchSettingsRequestSchema } from "$lib/api/generated/schemas";
-  import {
-    detailsToFieldErrors,
-    hasFieldError,
-    mergeFieldErrors,
-    toFieldErrorItems,
-    type FieldErrors,
-    zodErrorToFieldErrors,
-  } from "$lib/shared/forms/field-errors";
+  import { type FieldErrors, zodErrorToFieldErrors } from "$lib/shared/forms/field-errors";
+  import { useFieldErrors } from "$lib/shared/forms/use-field-errors.svelte";
   import PasswordInput from "$lib/shared/components/password-input.svelte";
   import * as Alert from "$lib/shadcn/components/ui/alert/index.js";
   import { Button } from "$lib/shadcn/components/ui/button/index.js";
@@ -33,7 +27,7 @@
   let welcomeMessage = $state("");
   let exampleApiBase = $state("");
   let exampleApiKey = $state("");
-  let settingsFieldErrors = $state<FieldErrors>({});
+  const settingsFieldErrors = useFieldErrors<string>();
 
   async function reload() {
     error = null;
@@ -53,11 +47,11 @@
   }
 
   function invalidSettings(...keys: string[]): boolean {
-    return hasFieldError(settingsFieldErrors, ...keys);
+    return settingsFieldErrors.invalid(...keys);
   }
 
   function settingsErrorItems(...keys: string[]) {
-    return toFieldErrorItems(settingsFieldErrors, ...keys);
+    return settingsFieldErrors.items(...keys);
   }
 
   async function save() {
@@ -90,11 +84,11 @@
     }
 
     if (Object.keys(localErrors).length > 0) {
-      settingsFieldErrors = localErrors;
+      settingsFieldErrors.setErrors(localErrors);
       return;
     }
 
-    settingsFieldErrors = {};
+    settingsFieldErrors.clearErrors();
     saving = true;
     try {
       const payload: PatchSettingsRequestDto = {};
@@ -118,13 +112,13 @@
       if (Object.keys(integrations).length) payload.integrations = integrations;
 
       if (!Object.keys(payload).length) {
-        settingsFieldErrors = {};
+        settingsFieldErrors.clearErrors();
         return;
       }
 
       const payloadCheck = PatchSettingsRequestSchema.safeParse(payload);
       if (!payloadCheck.success) {
-        settingsFieldErrors = zodErrorToFieldErrors(payloadCheck.error);
+        settingsFieldErrors.setErrors(zodErrorToFieldErrors(payloadCheck.error));
         return;
       }
 
@@ -134,12 +128,11 @@
       welcomeMessage = updated.app.welcome_message;
       exampleApiBase = updated.integrations.example_api_base;
       exampleApiKey = "";
-      settingsFieldErrors = {};
+      settingsFieldErrors.clearErrors();
     } catch (e) {
       if (e instanceof ApiError) {
-        const mapped = detailsToFieldErrors(e.body?.details);
-        settingsFieldErrors = mergeFieldErrors(settingsFieldErrors, mapped);
-        if (Object.keys(mapped).length > 0) {
+        settingsFieldErrors.mergeApiDetails(e.body?.details);
+        if (Object.keys(settingsFieldErrors.errors).length > 0) {
           return;
         }
       }
