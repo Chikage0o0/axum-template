@@ -9,10 +9,10 @@
   } from "$lib/api/generated/client";
   import { PatchSettingsRequest as PatchSettingsRequestSchema } from "$lib/api/generated/schemas";
   import { useApiFormSubmit } from "$lib/shared/forms/use-api-form-submit.svelte";
+  import LoadStatePanel from "$lib/shared/components/load-state-panel.svelte";
   import { type FieldErrors, zodErrorToFieldErrors } from "$lib/shared/forms/field-errors";
   import { useFieldErrors } from "$lib/shared/forms/use-field-errors.svelte";
   import PasswordInput from "$lib/shared/components/password-input.svelte";
-  import * as Alert from "$lib/shadcn/components/ui/alert/index.js";
   import { Button } from "$lib/shadcn/components/ui/button/index.js";
   import * as Card from "$lib/shadcn/components/ui/card/index.js";
   import * as Field from "$lib/shadcn/components/ui/field/index.js";
@@ -158,13 +158,6 @@
     <h1 class="text-2xl font-semibold tracking-tight">设置</h1>
   </div>
 
-  {#if error}
-    <Alert.Root variant="destructive">
-      <Alert.Title>请求失败</Alert.Title>
-      <Alert.Description>{error}</Alert.Description>
-    </Alert.Root>
-  {/if}
-
   <Card.Root id="runtime">
     <Card.Header class="space-y-3">
       <div class="flex flex-wrap items-center justify-between gap-3">
@@ -182,7 +175,14 @@
       </div>
     </Card.Header>
     <Card.Content>
-      {#if settings}
+      <LoadStatePanel
+        {loading}
+        {error}
+        isEmpty={!settings}
+        onRetry={reload}
+        emptyTitle="尚未加载配置"
+        emptyDescription="请点击刷新重新加载配置。"
+      >
         <div class="grid gap-4 sm:grid-cols-2">
           <Field.Field
             data-invalid={invalidSettings("check_interval_secs", "app.check_interval_secs") ||
@@ -238,7 +238,7 @@
             <PasswordInput
               id="example_api_key"
               bind:value={exampleApiKey}
-              placeholder={settings.integrations.example_api_key_is_set ? "已设置" : "未设置"}
+              placeholder={settings?.integrations.example_api_key_is_set ? "已设置" : "未设置"}
               aria-invalid={invalidSettings("example_api_key", "integrations.example_api_key")}
             />
             <Field.Error
@@ -246,9 +246,7 @@
             />
           </Field.Field>
         </div>
-      {:else}
-        <p class="text-muted-foreground text-sm">尚未加载配置。</p>
-      {/if}
+      </LoadStatePanel>
     </Card.Content>
   </Card.Root>
 </div>

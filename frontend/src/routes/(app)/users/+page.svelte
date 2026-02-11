@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { toast } from "svelte-sonner";
-  import UserPlusIcon from "@lucide/svelte/icons/user-plus";
   import { ApiError } from "$lib/api/mutator";
   import {
     createUserHandler,
@@ -26,22 +25,20 @@
   } from "$lib/shared/forms/field-errors";
   import { auth } from "$lib/features/auth/state/auth";
   import { buildUserPatchPayload } from "$lib/features/auth/model/user-helpers";
-  import * as Alert from "$lib/shadcn/components/ui/alert/index.js";
   import * as AlertDialog from "$lib/shadcn/components/ui/alert-dialog/index.js";
   import { Badge } from "$lib/shadcn/components/ui/badge/index.js";
-  import { Button } from "$lib/shadcn/components/ui/button/index.js";
   import * as Card from "$lib/shadcn/components/ui/card/index.js";
   import * as Empty from "$lib/shadcn/components/ui/empty/index.js";
   import * as Field from "$lib/shadcn/components/ui/field/index.js";
   import { Input } from "$lib/shadcn/components/ui/input/index.js";
   import * as Sheet from "$lib/shadcn/components/ui/sheet/index.js";
-  import { Skeleton } from "$lib/shadcn/components/ui/skeleton/index.js";
   import { Switch } from "$lib/shadcn/components/ui/switch/index.js";
   import * as Table from "$lib/shadcn/components/ui/table/index.js";
-  import * as Tooltip from "$lib/shadcn/components/ui/tooltip/index.js";
   import TruncateText from "$lib/shared/components/truncate-text.svelte";
   import UserRowActions from "$lib/app/components/user-row-actions.svelte";
   import UserAvatar from "$lib/shared/components/user-avatar.svelte";
+  import FormDialogShell from "$lib/shared/components/form-dialog-shell.svelte";
+  import LoadStatePanel from "$lib/shared/components/load-state-panel.svelte";
   import UserProfileFields from "$lib/shared/components/user-profile-fields.svelte";
   import UsersToolbar from "$lib/app/components/users-toolbar.svelte";
 
@@ -83,6 +80,7 @@
   let deleteTarget = $state<UserResponse | null>(null);
 
   const sheetTitle = $derived(sheetMode === "create" ? "新增用户" : "编辑用户");
+  const sheetSubmitLabel = $derived(sheetMode === "create" ? "创建用户" : "保存修改");
 
   function isSelfRow(userId: string): boolean {
     return $auth.user?.sub === userId;
@@ -298,13 +296,6 @@
       </Empty.Header>
     </Empty.Root>
   {:else}
-    {#if listError}
-      <Alert.Root variant="destructive">
-        <Alert.Title>请求失败</Alert.Title>
-        <Alert.Description>{listError}</Alert.Description>
-      </Alert.Root>
-    {/if}
-
     <Card.Root>
       <Card.Header class="space-y-2">
         <Card.Title>用户列表</Card.Title>
@@ -312,100 +303,79 @@
       </Card.Header>
 
       <Card.Content>
-        {#if listLoading}
-          <!-- 骨架屏加载态 -->
-          <div class="space-y-4">
-            {#each Array.from({ length: 5 }, (_, index) => index) as index (index)}
-              <div class="flex items-center gap-4">
-                <Skeleton class="size-8 rounded-full" />
-                <Skeleton class="h-4 w-24" />
-                <Skeleton class="h-4 w-20" />
-                <Skeleton class="h-4 w-36" />
-                <Skeleton class="h-5 w-12 rounded-full" />
-              </div>
-            {/each}
-          </div>
-        {:else if users.length === 0}
-          <Empty.Root class="min-h-44">
-            <Empty.Header>
-              <Empty.Title>暂无用户数据</Empty.Title>
-              <Empty.Description>可以先新增一个用户。</Empty.Description>
-            </Empty.Header>
-            <Empty.Content>
-              <Button onclick={openCreateSheet}>
-                <UserPlusIcon class="size-4" />
-                新增用户
-              </Button>
-            </Empty.Content>
-          </Empty.Root>
-        {:else}
-          <Tooltip.Provider>
-            <Table.Root class="table-fixed">
-              <Table.Header>
-                <Table.Row>
-                  <Table.Head class="w-[30%]">用户</Table.Head>
-                  <Table.Head class="w-[25%]">用户名</Table.Head>
-                  <Table.Head class="w-[25%]">邮箱</Table.Head>
-                  <Table.Head class="w-[10%]">状态</Table.Head>
-                  <Table.Head class="w-[10%]"></Table.Head>
-                </Table.Row>
-              </Table.Header>
+        <LoadStatePanel
+          loading={listLoading}
+          error={listError}
+          isEmpty={users.length === 0}
+          onRetry={reloadUsers}
+          onCreate={openCreateSheet}
+          emptyTitle="暂无用户数据"
+          emptyDescription="可以先新增一个用户。"
+          createLabel="新增用户"
+          loadingRows={5}
+        >
+          <Table.Root class="table-fixed">
+            <Table.Header>
+              <Table.Row>
+                <Table.Head class="w-[30%]">用户</Table.Head>
+                <Table.Head class="w-[25%]">用户名</Table.Head>
+                <Table.Head class="w-[25%]">邮箱</Table.Head>
+                <Table.Head class="w-[10%]">状态</Table.Head>
+                <Table.Head class="w-[10%]"></Table.Head>
+              </Table.Row>
+            </Table.Header>
 
-              <Table.Body>
-                {#each users as user (user.id)}
-                  <Table.Row class={isSelfRow(user.id) ? "bg-muted/40" : ""}>
-                    <!-- 头像 + 显示名称 -->
-                    <Table.Cell>
-                      <div class="flex items-center gap-3 min-w-0">
-                        <UserAvatar
-                          src={user.avatar_url ?? ""}
-                          alt={user.display_name}
-                          email={user.email}
-                          displayName={user.display_name}
-                          id={user.id}
-                        />
-                        <div class="flex flex-col min-w-0">
-                          <TruncateText
-                            text={user.display_name}
-                            class="font-medium leading-tight"
-                          />
-                          {#if isSelfRow(user.id)}
-                            <span class="text-muted-foreground text-xs">当前账号</span>
-                          {/if}
-                        </div>
-                      </div>
-                    </Table.Cell>
-                    <Table.Cell class="text-muted-foreground">
-                      <TruncateText text={user.username ?? "-"} />
-                    </Table.Cell>
-                    <Table.Cell class="text-muted-foreground">
-                      <TruncateText text={user.email} />
-                    </Table.Cell>
-                    <Table.Cell>
-                      {#if user.is_active}
-                        <Badge
-                          class="border-emerald-600/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                          >启用</Badge
-                        >
-                      {:else}
-                        <Badge variant="destructive">禁用</Badge>
-                      {/if}
-                    </Table.Cell>
-                    <Table.Cell>
-                      <UserRowActions
-                        row={user}
-                        currentUserId={$auth.user?.sub}
-                        {deletingUserId}
-                        onEdit={openEditSheet}
-                        onDelete={requestDelete}
+            <Table.Body>
+              {#each users as user (user.id)}
+                <Table.Row class={isSelfRow(user.id) ? "bg-muted/40" : ""}>
+                  <!-- 头像 + 显示名称 -->
+                  <Table.Cell>
+                    <div class="flex items-center gap-3 min-w-0">
+                      <UserAvatar
+                        src={user.avatar_url ?? ""}
+                        alt={user.display_name}
+                        email={user.email}
+                        displayName={user.display_name}
+                        id={user.id}
                       />
-                    </Table.Cell>
-                  </Table.Row>
-                {/each}
-              </Table.Body>
-            </Table.Root>
-          </Tooltip.Provider>
-        {/if}
+                      <div class="flex flex-col min-w-0">
+                        <TruncateText text={user.display_name} class="font-medium leading-tight" />
+                        {#if isSelfRow(user.id)}
+                          <span class="text-muted-foreground text-xs">当前账号</span>
+                        {/if}
+                      </div>
+                    </div>
+                  </Table.Cell>
+                  <Table.Cell class="text-muted-foreground">
+                    <TruncateText text={user.username ?? "-"} />
+                  </Table.Cell>
+                  <Table.Cell class="text-muted-foreground">
+                    <TruncateText text={user.email} />
+                  </Table.Cell>
+                  <Table.Cell>
+                    {#if user.is_active}
+                      <Badge
+                        class="border-emerald-600/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                        >启用</Badge
+                      >
+                    {:else}
+                      <Badge variant="destructive">禁用</Badge>
+                    {/if}
+                  </Table.Cell>
+                  <Table.Cell>
+                    <UserRowActions
+                      row={user}
+                      currentUserId={$auth.user?.sub}
+                      {deletingUserId}
+                      onEdit={openEditSheet}
+                      onDelete={requestDelete}
+                    />
+                  </Table.Cell>
+                </Table.Row>
+              {/each}
+            </Table.Body>
+          </Table.Root>
+        </LoadStatePanel>
       </Card.Content>
     </Card.Root>
   {/if}
@@ -497,14 +467,12 @@
         </Field.Field>
       {/if}
 
-      <div class="md:col-span-2 flex justify-end gap-2 pt-1">
-        <Button type="button" variant="outline" disabled={sheetSubmitting} onclick={closeSheet}>
-          取消
-        </Button>
-        <Button type="submit" disabled={sheetSubmitting}>
-          {sheetSubmitting ? "保存中..." : sheetMode === "create" ? "创建用户" : "保存修改"}
-        </Button>
-      </div>
+      <FormDialogShell
+        submitting={sheetSubmitting}
+        submitLabel={sheetSubmitLabel}
+        submittingLabel="保存中..."
+        onCancel={closeSheet}
+      />
     </form>
   </Sheet.Content>
 </Sheet.Root>
