@@ -202,7 +202,7 @@ RETURNING id
         let password_hash =
             crate::password::hash_password_argon2id(password).expect("生成管理员密码哈希失败");
 
-        sqlx::query_scalar::<_, Uuid>(
+        sqlx::query_scalar!(
             r#"
 INSERT INTO users (
     username,
@@ -226,8 +226,8 @@ DO UPDATE SET
     updated_at = NOW()
 RETURNING id
             "#,
+            password_hash,
         )
-        .bind(password_hash)
         .fetch_one(pool)
         .await
         .expect("创建或更新管理员测试用户失败")

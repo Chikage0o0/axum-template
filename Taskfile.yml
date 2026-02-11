@@ -81,12 +81,32 @@ tasks:
     cmds:
       - cargo fmt -- --check
       - task backend:lint
+      - task backend:sqlx:macro:check
       - task backend:test
 
   backend:sqlx:check:
     desc: 校验 sqlx 离线缓存是否最新
     cmds:
       - cargo sqlx prepare --check
+
+  backend:sqlx:macro:check:
+    desc: 禁止使用非宏 sqlx 调用（query/query_as/query_scalar）
+    cmds:
+      - |
+        set +e
+        rg -n 'sqlx::query(?:_as|_scalar)?\s*(?:::<[^>]*>)?\s*\(' src --glob '*.rs'
+        status=$?
+        set -e
+
+        if [ "$status" -eq 0 ]; then
+          echo '发现非宏 sqlx 调用，请改用 query!/query_as!/query_scalar!'
+          exit 1
+        fi
+
+        if [ "$status" -ne 1 ]; then
+          echo "sqlx 宏调用扫描失败（rg 退出码: $status）"
+          exit "$status"
+        fi
 
   dev:fmt:
     desc: 格式化前后端代码

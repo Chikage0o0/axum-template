@@ -28,3 +28,10 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+
+      - id: sqlx-macro-check
+        name: sqlx-macro-check
+        entry: task backend:sqlx:macro:check
+        language: system
+        pass_filenames: false
+        always_run: true
