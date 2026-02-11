@@ -117,6 +117,8 @@
 
 以下接口均需要 Bearer Token。
 
+权限说明：除 `GET /api/v1/users/me` 外，用户管理接口均要求 `admin` 角色，非管理员返回 `403`（错误码 `2002`）。
+
 ### 获取当前登录用户
 
 `GET /api/v1/users/me`
@@ -126,6 +128,10 @@
 ### 获取用户列表
 
 `GET /api/v1/users`
+
+查询参数：
+
+- `include_deleted`（可选，默认 `false`）：`false` 时仅返回未删除用户；`true` 时包含已逻辑删除用户
 
 响应示例：
 
@@ -200,3 +206,17 @@
 `DELETE /api/v1/users/{user_id}/identities/{identity_id}`
 
 响应：`204 No Content`。
+
+### 逻辑删除用户
+
+`DELETE /api/v1/users/{user_id}`
+
+响应：`204 No Content`。
+
+说明：该操作为逻辑删除（设置 `deleted_at`），默认用户列表将隐藏该用户。
+
+### 恢复已删除用户
+
+`POST /api/v1/users/{user_id}/restore`
+
+响应：`200 OK`，返回恢复后的用户对象。
