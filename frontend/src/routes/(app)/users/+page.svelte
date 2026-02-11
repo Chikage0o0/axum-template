@@ -1,10 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { toast } from "svelte-sonner";
-  import EllipsisVerticalIcon from "@lucide/svelte/icons/ellipsis-vertical";
-  import PencilIcon from "@lucide/svelte/icons/pencil";
-  import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
-  import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import UserPlusIcon from "@lucide/svelte/icons/user-plus";
   import { ApiError } from "$lib/api/mutator";
   import {
@@ -35,7 +31,6 @@
   import { Badge } from "$lib/shadcn/components/ui/badge/index.js";
   import { Button } from "$lib/shadcn/components/ui/button/index.js";
   import * as Card from "$lib/shadcn/components/ui/card/index.js";
-  import * as DropdownMenu from "$lib/shadcn/components/ui/dropdown-menu/index.js";
   import * as Empty from "$lib/shadcn/components/ui/empty/index.js";
   import * as Field from "$lib/shadcn/components/ui/field/index.js";
   import { Input } from "$lib/shadcn/components/ui/input/index.js";
@@ -45,8 +40,10 @@
   import * as Table from "$lib/shadcn/components/ui/table/index.js";
   import * as Tooltip from "$lib/shadcn/components/ui/tooltip/index.js";
   import TruncateText from "$lib/shared/components/truncate-text.svelte";
+  import UserRowActions from "$lib/app/components/user-row-actions.svelte";
   import UserAvatar from "$lib/shared/components/user-avatar.svelte";
   import UserProfileFields from "$lib/shared/components/user-profile-fields.svelte";
+  import UsersToolbar from "$lib/app/components/users-toolbar.svelte";
 
   type SheetMode = "create" | "edit";
   type UserFormDraft = {
@@ -290,16 +287,7 @@
   <!-- 页面标题栏 -->
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h1 class="text-2xl font-semibold tracking-tight">用户管理</h1>
-    <div class="flex items-center gap-2">
-      <Button variant="outline" disabled={listLoading} onclick={reloadUsers}>
-        <RefreshCwIcon class={`size-4 ${listLoading ? "animate-spin" : ""}`} />
-        {listLoading ? "刷新中..." : "刷新"}
-      </Button>
-      <Button onclick={openCreateSheet}>
-        <UserPlusIcon class="size-4" />
-        新增用户
-      </Button>
-    </div>
+    <UsersToolbar loading={listLoading} onRefresh={reloadUsers} onCreate={openCreateSheet} />
   </div>
 
   {#if permissionDenied}
@@ -404,60 +392,13 @@
                       {/if}
                     </Table.Cell>
                     <Table.Cell>
-                      <!-- 行操作下拉菜单 -->
-                      <DropdownMenu.Root>
-                        <DropdownMenu.Trigger>
-                          {#snippet child({ props })}
-                            <Button
-                              {...props}
-                              variant="ghost"
-                              size="icon"
-                              class="size-8"
-                              aria-label="操作菜单"
-                            >
-                              <EllipsisVerticalIcon class="size-4" />
-                            </Button>
-                          {/snippet}
-                        </DropdownMenu.Trigger>
-                        <DropdownMenu.Content align="end">
-                          <DropdownMenu.Item
-                            disabled={deletingUserId === user.id}
-                            onclick={() => openEditSheet(user)}
-                          >
-                            <PencilIcon class="size-4" />
-                            编辑
-                          </DropdownMenu.Item>
-                          <DropdownMenu.Separator />
-                          {#if isSelfRow(user.id)}
-                            <Tooltip.Provider>
-                              <Tooltip.Root>
-                                <Tooltip.Trigger>
-                                  {#snippet child({ props })}
-                                    <div {...props}>
-                                      <DropdownMenu.Item disabled>
-                                        <Trash2Icon class="size-4" />
-                                        删除
-                                      </DropdownMenu.Item>
-                                    </div>
-                                  {/snippet}
-                                </Tooltip.Trigger>
-                                <Tooltip.Content>
-                                  <p>当前登录账号不允许自删除</p>
-                                </Tooltip.Content>
-                              </Tooltip.Root>
-                            </Tooltip.Provider>
-                          {:else}
-                            <DropdownMenu.Item
-                              class="text-destructive focus:text-destructive"
-                              disabled={deletingUserId === user.id}
-                              onclick={() => requestDelete(user)}
-                            >
-                              <Trash2Icon class="size-4" />
-                              {deletingUserId === user.id ? "删除中..." : "删除"}
-                            </DropdownMenu.Item>
-                          {/if}
-                        </DropdownMenu.Content>
-                      </DropdownMenu.Root>
+                      <UserRowActions
+                        row={user}
+                        currentUserId={$auth.user?.sub}
+                        {deletingUserId}
+                        onEdit={openEditSheet}
+                        onDelete={requestDelete}
+                      />
                     </Table.Cell>
                   </Table.Row>
                 {/each}
