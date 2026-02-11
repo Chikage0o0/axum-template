@@ -46,6 +46,7 @@
   import * as Tooltip from "$lib/shadcn/components/ui/tooltip/index.js";
   import TruncateText from "$lib/shared/components/truncate-text.svelte";
   import UserAvatar from "$lib/shared/components/user-avatar.svelte";
+  import UserProfileFields from "$lib/shared/components/user-profile-fields.svelte";
 
   type SheetMode = "create" | "edit";
   type UserFormDraft = {
@@ -514,30 +515,12 @@
         void submitSheet();
       }}
     >
-      <Field.Field data-invalid={invalidSheet("display_name") || undefined}>
-        <Field.Label for="user_display_name">显示名称 *</Field.Label>
-        <Input
-          id="user_display_name"
-          placeholder="例如：张三"
-          bind:value={draft.display_name}
-          disabled={sheetSubmitting}
-          aria-invalid={invalidSheet("display_name")}
-        />
-        <Field.Error errors={sheetErrorItems("display_name")} />
-      </Field.Field>
-
-      <Field.Field data-invalid={invalidSheet("email") || undefined}>
-        <Field.Label for="user_email">邮箱 *</Field.Label>
-        <Input
-          id="user_email"
-          type="email"
-          placeholder="user@example.com"
-          bind:value={draft.email}
-          disabled={sheetSubmitting}
-          aria-invalid={invalidSheet("email")}
-        />
-        <Field.Error errors={sheetErrorItems("email")} />
-      </Field.Field>
+      <UserProfileFields
+        bind:draft
+        errors={sheetFieldErrors}
+        disabled={sheetSubmitting}
+        idPrefix="user"
+      />
 
       <Field.Field data-invalid={invalidSheet("username") || undefined}>
         <Field.Label for="user_username">用户名</Field.Label>
@@ -549,33 +532,6 @@
           aria-invalid={invalidSheet("username")}
         />
         <Field.Error errors={sheetErrorItems("username")} />
-      </Field.Field>
-
-      <Field.Field data-invalid={invalidSheet("phone") || undefined}>
-        <Field.Label for="user_phone">手机号</Field.Label>
-        <Input
-          id="user_phone"
-          placeholder="可选"
-          bind:value={draft.phone}
-          disabled={sheetSubmitting}
-          aria-invalid={invalidSheet("phone")}
-        />
-        <Field.Error errors={sheetErrorItems("phone")} />
-      </Field.Field>
-
-      <Field.Field
-        class="md:col-span-2 min-w-0"
-        data-invalid={invalidSheet("avatar_url") || undefined}
-      >
-        <Field.Label for="user_avatar_url">头像链接</Field.Label>
-        <Input
-          id="user_avatar_url"
-          placeholder="https://example.com/avatar.png"
-          bind:value={draft.avatar_url}
-          disabled={sheetSubmitting}
-          aria-invalid={invalidSheet("avatar_url")}
-        />
-        <Field.Error errors={sheetErrorItems("avatar_url")} />
       </Field.Field>
 
       {#if sheetMode === "edit"}

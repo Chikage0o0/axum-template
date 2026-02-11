@@ -31,11 +31,11 @@
     type CurrentUserDraft,
   } from "$lib/features/auth/model/user-helpers";
   import PasswordInput from "$lib/shared/components/password-input.svelte";
+  import UserProfileFields from "$lib/shared/components/user-profile-fields.svelte";
   import UserAvatar from "$lib/shared/components/user-avatar.svelte";
   import { Button } from "$lib/shadcn/components/ui/button/index.js";
   import * as Dialog from "$lib/shadcn/components/ui/dialog/index.js";
   import * as Field from "$lib/shadcn/components/ui/field/index.js";
-  import { Input } from "$lib/shadcn/components/ui/input/index.js";
   import * as DropdownMenu from "$lib/shadcn/components/ui/dropdown-menu/index.js";
   import * as Sidebar from "$lib/shadcn/components/ui/sidebar/index.js";
   import { useSidebar } from "$lib/shadcn/components/ui/sidebar/index.js";
@@ -81,14 +81,6 @@
       phone: nextUser.phone ?? "",
       avatar_url: nextUser.avatar_url ?? "",
     };
-  }
-
-  function invalidProfile(...keys: string[]): boolean {
-    return hasFieldError(profileFieldErrors, ...keys);
-  }
-
-  function profileErrorItems(...keys: string[]) {
-    return toFieldErrorItems(profileFieldErrors, ...keys);
   }
 
   function invalidPassword(...keys: string[]): boolean {
@@ -323,54 +315,12 @@
         void submitCurrentUserProfile();
       }}
     >
-      <Field.Field data-invalid={invalidProfile("display_name") || undefined}>
-        <Field.Label for="sidebar_display_name">显示名称 *</Field.Label>
-        <Input
-          id="sidebar_display_name"
-          bind:value={currentUserDraft.display_name}
-          placeholder="例如：张三"
-          disabled={savingCurrentUser || loadingCurrentUser || !currentUser}
-          aria-invalid={invalidProfile("display_name")}
-        />
-        <Field.Error errors={profileErrorItems("display_name")} />
-      </Field.Field>
-
-      <Field.Field data-invalid={invalidProfile("email") || undefined}>
-        <Field.Label for="sidebar_email">邮箱 *</Field.Label>
-        <Input
-          id="sidebar_email"
-          type="email"
-          bind:value={currentUserDraft.email}
-          placeholder="user@example.com"
-          disabled={savingCurrentUser || loadingCurrentUser || !currentUser}
-          aria-invalid={invalidProfile("email")}
-        />
-        <Field.Error errors={profileErrorItems("email")} />
-      </Field.Field>
-
-      <Field.Field data-invalid={invalidProfile("phone") || undefined}>
-        <Field.Label for="sidebar_phone">手机号</Field.Label>
-        <Input
-          id="sidebar_phone"
-          bind:value={currentUserDraft.phone}
-          placeholder="可选"
-          disabled={savingCurrentUser || loadingCurrentUser || !currentUser}
-          aria-invalid={invalidProfile("phone")}
-        />
-        <Field.Error errors={profileErrorItems("phone")} />
-      </Field.Field>
-
-      <Field.Field data-invalid={invalidProfile("avatar_url") || undefined}>
-        <Field.Label for="sidebar_avatar_url">头像链接</Field.Label>
-        <Input
-          id="sidebar_avatar_url"
-          bind:value={currentUserDraft.avatar_url}
-          placeholder="https://example.com/avatar.png"
-          disabled={savingCurrentUser || loadingCurrentUser || !currentUser}
-          aria-invalid={invalidProfile("avatar_url")}
-        />
-        <Field.Error errors={profileErrorItems("avatar_url")} />
-      </Field.Field>
+      <UserProfileFields
+        bind:draft={currentUserDraft}
+        errors={profileFieldErrors}
+        disabled={savingCurrentUser || loadingCurrentUser || !currentUser}
+        idPrefix="sidebar"
+      />
 
       <div class="md:col-span-2 flex items-center justify-between gap-2">
         <p class="text-muted-foreground text-xs">
