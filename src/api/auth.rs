@@ -31,6 +31,7 @@ pub struct Claims {
 pub struct CurrentUser {
     pub user_id: Uuid,
     pub session_id: Uuid,
+    pub role: String,
 }
 
 pub async fn auth_middleware(
@@ -106,6 +107,7 @@ LIMIT 1
     req.extensions_mut().insert(CurrentUser {
         user_id,
         session_id,
+        role: token_data.claims.role,
     });
 
     Ok(next.run(req).await)

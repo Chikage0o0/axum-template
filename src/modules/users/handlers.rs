@@ -213,6 +213,15 @@ pub struct ListUsersQuery {
     pub include_deleted: bool,
 }
 
+fn ensure_admin(current_user: &CurrentUser) -> Result<(), AppError> {
+    if current_user.role != "admin" {
+        return Err(AppError::PermissionDenied(
+            "仅管理员可执行该操作".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 #[utoipa::path(
     get,
     path = "/api/v1/users/me",
@@ -248,9 +257,11 @@ pub async fn get_current_user_handler(
     security(("bearer_auth" = []))
 )]
 pub async fn get_users_handler(
+    Extension(current_user): Extension<CurrentUser>,
     Query(query): Query<ListUsersQuery>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<UserResponse>>, AppError> {
+    ensure_admin(&current_user)?;
     let users = list_users(&state.db, query.include_deleted).await?;
     Ok(Json(users))
 }
@@ -269,11 +280,13 @@ pub async fn get_users_handler(
     security(("bearer_auth" = []))
 )]
 pub async fn create_user_handler(
+    Extension(current_user): Extension<CurrentUser>,
     State(state): State<AppState>,
     crate::api::validation::ValidatedJson(payload): crate::api::validation::ValidatedJson<
         CreateUserRequest,
     >,
 ) -> Result<(StatusCode, Json<UserResponse>), AppError> {
+    ensure_admin(&current_user)?;
     ensure_no_duplicate_provider_bindings(&payload.identities)?;
     for identity in &payload.identities {
         validate_identity_semantics(identity)?;
@@ -299,12 +312,14 @@ pub async fn create_user_handler(
     security(("bearer_auth" = []))
 )]
 pub async fn patch_user_handler(
+    Extension(current_user): Extension<CurrentUser>,
     Path(user_id): Path<Uuid>,
     State(state): State<AppState>,
     crate::api::validation::ValidatedJson(payload): crate::api::validation::ValidatedJson<
         PatchUserRequest,
     >,
 ) -> Result<Json<UserResponse>, AppError> {
+    ensure_admin(&current_user)?;
     let user = patch_user(&state.db, user_id, payload).await?;
     Ok(Json(user))
 }
@@ -323,9 +338,11 @@ pub async fn patch_user_handler(
     security(("bearer_auth" = []))
 )]
 pub async fn delete_user_handler(
+    Extension(current_user): Extension<CurrentUser>,
     Path(user_id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<StatusCode, AppError> {
+    ensure_admin(&current_user)?;
     soft_delete_user(&state.db, user_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -344,9 +361,11 @@ pub async fn delete_user_handler(
     security(("bearer_auth" = []))
 )]
 pub async fn restore_user_handler(
+    Extension(current_user): Extension<CurrentUser>,
     Path(user_id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<Json<UserResponse>, AppError> {
+    ensure_admin(&current_user)?;
     let user = restore_user(&state.db, user_id).await?;
     Ok(Json(user))
 }
