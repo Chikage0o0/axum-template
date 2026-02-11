@@ -55,7 +55,7 @@
     return {
       name: displayName,
       email: currentUser?.email?.trim() || "未获取邮箱",
-      avatar: "",
+      avatar: currentUser?.avatarUrl?.trim() || "",
     };
   });
 </script>

@@ -166,6 +166,30 @@ describe("toAuthUser", () => {
       sub: "11111111-1111-1111-1111-111111111111",
       displayName: "Alice",
       email: "alice@example.com",
+      avatarUrl: "",
+    });
+  });
+
+  it("should map avatar_url to avatarUrl", () => {
+    const mapped = toAuthUser({
+      id: "11111111-1111-1111-1111-111111111111",
+      username: "alice",
+      display_name: "Alice",
+      email: "alice@example.com",
+      phone: null,
+      avatar_url: " https://example.com/avatar.png ",
+      is_active: true,
+      metadata: {},
+      identities: [],
+      created_at: "2026-02-06T09:00:00Z",
+      updated_at: "2026-02-06T09:00:00Z",
+    });
+
+    expect(mapped).toEqual({
+      sub: "11111111-1111-1111-1111-111111111111",
+      displayName: "Alice",
+      email: "alice@example.com",
+      avatarUrl: "https://example.com/avatar.png",
     });
   });
 

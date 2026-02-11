@@ -3,7 +3,6 @@
   import KeyRoundIcon from "@lucide/svelte/icons/key-round";
   import LogOutIcon from "@lucide/svelte/icons/log-out";
   import UserPenIcon from "@lucide/svelte/icons/user-pen";
-  import { AvatarBeam } from "svelte-boring-avatars";
   import { toast } from "svelte-sonner";
   import { ApiError } from "$lib/api/mutator";
   import {
@@ -32,11 +31,11 @@
     type CurrentUserDraft,
   } from "$lib/features/auth/model/user-helpers";
   import PasswordInput from "$lib/shared/components/password-input.svelte";
+  import UserAvatar from "$lib/shared/components/user-avatar.svelte";
   import { Button } from "$lib/shadcn/components/ui/button/index.js";
   import * as Dialog from "$lib/shadcn/components/ui/dialog/index.js";
   import * as Field from "$lib/shadcn/components/ui/field/index.js";
   import { Input } from "$lib/shadcn/components/ui/input/index.js";
-  import * as Avatar from "$lib/shadcn/components/ui/avatar/index.js";
   import * as DropdownMenu from "$lib/shadcn/components/ui/dropdown-menu/index.js";
   import * as Sidebar from "$lib/shadcn/components/ui/sidebar/index.js";
   import { useSidebar } from "$lib/shadcn/components/ui/sidebar/index.js";
@@ -54,24 +53,6 @@
   } = $props();
 
   const sidebar = useSidebar();
-  const beamColors = [
-    "var(--sidebar-primary)",
-    "var(--chart-1)",
-    "var(--chart-2)",
-    "var(--chart-3)",
-    "var(--chart-4)",
-  ];
-
-  const fallbackSeed = $derived.by(() => {
-    const email = user.email.trim();
-    if (email) return email;
-
-    const name = user.name.trim();
-    if (name) return name;
-
-    return "current-user";
-  });
-
   let profileDialogOpen = $state(false);
   let passwordDialogOpen = $state(false);
 
@@ -260,14 +241,12 @@
             size="lg"
             class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
           >
-            <Avatar.Root class="size-8 rounded-lg">
-              <Avatar.Image src={user.avatar} alt={user.name} />
-              <Avatar.Fallback class="rounded-lg p-0">
-                {#key fallbackSeed}
-                  <AvatarBeam size={32} name={fallbackSeed} square={true} colors={beamColors} />
-                {/key}
-              </Avatar.Fallback>
-            </Avatar.Root>
+            <UserAvatar
+              src={user.avatar}
+              alt={user.name}
+              email={user.email}
+              displayName={user.name}
+            />
             <div class="grid flex-1 text-start text-sm leading-tight">
               <span class="truncate font-medium">{user.name}</span>
               <span class="truncate text-xs">{user.email}</span>
@@ -285,14 +264,12 @@
       >
         <DropdownMenu.Label class="p-0 font-normal">
           <div class="flex items-center gap-2 px-1 py-1.5 text-start text-sm">
-            <Avatar.Root class="size-8 rounded-lg">
-              <Avatar.Image src={user.avatar} alt={user.name} />
-              <Avatar.Fallback class="rounded-lg p-0">
-                {#key fallbackSeed}
-                  <AvatarBeam size={32} name={fallbackSeed} square={true} colors={beamColors} />
-                {/key}
-              </Avatar.Fallback>
-            </Avatar.Root>
+            <UserAvatar
+              src={user.avatar}
+              alt={user.name}
+              email={user.email}
+              displayName={user.name}
+            />
             <div class="grid flex-1 text-start text-sm leading-tight">
               <span class="truncate font-medium">{user.name}</span>
               <span class="truncate text-xs">{user.email}</span>
@@ -324,7 +301,7 @@
 <Dialog.Root bind:open={profileDialogOpen}>
   <Dialog.Content class="sm:max-w-xl">
     <Dialog.Header>
-      <Dialog.Title>当前用户信息</Dialog.Title>
+      <Dialog.Title>编辑当前用户信息</Dialog.Title>
     </Dialog.Header>
 
     <form
@@ -335,10 +312,11 @@
       }}
     >
       <Field.Field data-invalid={invalidProfile("display_name") || undefined}>
-        <Field.Label for="sidebar_display_name">display_name *</Field.Label>
+        <Field.Label for="sidebar_display_name">显示名称 *</Field.Label>
         <Input
           id="sidebar_display_name"
           bind:value={currentUserDraft.display_name}
+          placeholder="例如：张三"
           disabled={savingCurrentUser || loadingCurrentUser || !currentUser}
           aria-invalid={invalidProfile("display_name")}
         />
@@ -346,10 +324,12 @@
       </Field.Field>
 
       <Field.Field data-invalid={invalidProfile("email") || undefined}>
-        <Field.Label for="sidebar_email">email *</Field.Label>
+        <Field.Label for="sidebar_email">邮箱 *</Field.Label>
         <Input
           id="sidebar_email"
+          type="email"
           bind:value={currentUserDraft.email}
+          placeholder="user@example.com"
           disabled={savingCurrentUser || loadingCurrentUser || !currentUser}
           aria-invalid={invalidProfile("email")}
         />
@@ -357,10 +337,11 @@
       </Field.Field>
 
       <Field.Field data-invalid={invalidProfile("phone") || undefined}>
-        <Field.Label for="sidebar_phone">phone</Field.Label>
+        <Field.Label for="sidebar_phone">手机号</Field.Label>
         <Input
           id="sidebar_phone"
           bind:value={currentUserDraft.phone}
+          placeholder="可选"
           disabled={savingCurrentUser || loadingCurrentUser || !currentUser}
           aria-invalid={invalidProfile("phone")}
         />
@@ -368,10 +349,11 @@
       </Field.Field>
 
       <Field.Field data-invalid={invalidProfile("avatar_url") || undefined}>
-        <Field.Label for="sidebar_avatar_url">avatar_url</Field.Label>
+        <Field.Label for="sidebar_avatar_url">头像链接</Field.Label>
         <Input
           id="sidebar_avatar_url"
           bind:value={currentUserDraft.avatar_url}
+          placeholder="https://example.com/avatar.png"
           disabled={savingCurrentUser || loadingCurrentUser || !currentUser}
           aria-invalid={invalidProfile("avatar_url")}
         />

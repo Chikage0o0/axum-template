@@ -105,12 +105,15 @@ export function buildCurrentUserPatchPayload(
   return { ok: true, payload };
 }
 
-export function toAuthUser(user: Pick<User, "id" | "display_name" | "email">): AuthUser | null {
+export function toAuthUser(
+  user: Pick<User, "id" | "display_name" | "email" | "avatar_url">,
+): AuthUser | null {
   const sub = user.id.trim();
   const displayName = user.display_name.trim();
   const email = user.email.trim();
+  const avatarUrl = user.avatar_url?.trim() ?? "";
   if (!sub || !displayName || !email) return null;
-  return { sub, displayName, email };
+  return { sub, displayName, email, avatarUrl };
 }
 
 function isEmail(input: string): boolean {

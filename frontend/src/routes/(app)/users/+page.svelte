@@ -6,7 +6,6 @@
   import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import UserPlusIcon from "@lucide/svelte/icons/user-plus";
-  import { AvatarBeam } from "svelte-boring-avatars";
   import { ApiError } from "$lib/api/mutator";
   import {
     createUserHandler,
@@ -32,7 +31,6 @@
   import { auth } from "$lib/features/auth/state/auth";
   import * as Alert from "$lib/shadcn/components/ui/alert/index.js";
   import * as AlertDialog from "$lib/shadcn/components/ui/alert-dialog/index.js";
-  import * as Avatar from "$lib/shadcn/components/ui/avatar/index.js";
   import { Badge } from "$lib/shadcn/components/ui/badge/index.js";
   import { Button } from "$lib/shadcn/components/ui/button/index.js";
   import * as Card from "$lib/shadcn/components/ui/card/index.js";
@@ -46,6 +44,7 @@
   import * as Table from "$lib/shadcn/components/ui/table/index.js";
   import * as Tooltip from "$lib/shadcn/components/ui/tooltip/index.js";
   import TruncateText from "$lib/shared/components/truncate-text.svelte";
+  import UserAvatar from "$lib/shared/components/user-avatar.svelte";
 
   type SheetMode = "create" | "edit";
   type UserFormDraft = {
@@ -85,24 +84,6 @@
   let deleteTarget = $state<UserResponse | null>(null);
 
   const sheetTitle = $derived(sheetMode === "create" ? "新增用户" : "编辑用户");
-
-  /** 与侧边栏 nav-user 保持一致的 AvatarBeam 配色 */
-  const beamColors = [
-    "var(--sidebar-primary)",
-    "var(--chart-1)",
-    "var(--chart-2)",
-    "var(--chart-3)",
-    "var(--chart-4)",
-  ];
-
-  /** 生成头像 fallback seed，优先使用 email，否则 display_name */
-  function avatarSeed(user: UserResponse): string {
-    const email = user.email?.trim();
-    if (email) return email;
-    const name = user.display_name?.trim();
-    if (name) return name;
-    return user.id;
-  }
 
   function isSelfRow(userId: string): boolean {
     return $auth.user?.sub === userId;
@@ -412,14 +393,13 @@
                     <!-- 头像 + 显示名称 -->
                     <Table.Cell>
                       <div class="flex items-center gap-3 min-w-0">
-                        <Avatar.Root class="size-8 shrink-0">
-                          {#if user.avatar_url}
-                            <Avatar.Image src={user.avatar_url} alt={user.display_name} />
-                          {/if}
-                          <Avatar.Fallback class="p-0">
-                            <AvatarBeam size={32} name={avatarSeed(user)} colors={beamColors} />
-                          </Avatar.Fallback>
-                        </Avatar.Root>
+                        <UserAvatar
+                          src={user.avatar_url ?? ""}
+                          alt={user.display_name}
+                          email={user.email}
+                          displayName={user.display_name}
+                          id={user.id}
+                        />
                         <div class="flex flex-col min-w-0">
                           <TruncateText
                             text={user.display_name}
