@@ -1,6 +1,6 @@
 # 数据库（模板）
 
-本模板包含以下核心表：`system_config`、`users`、`user_identities`。
+本模板包含以下核心表：`system_config`、`users`、`auth_sessions`。
 
 ## SQL 开发约束
 
@@ -41,7 +41,6 @@
 - 存储用户基本信息（本地用户主表）
 - `password_hash` 用于本地用户名/密码登录；为空表示仅支持外部身份登录
 - `auth_version` 用于用户级凭证版本控制（改密后递增，旧 access token 立即失效）
-- 与 `user_identities` 形成 1:N 关系，支持一个用户绑定多个外部身份
 
 ## 表：auth_sessions
 
@@ -59,22 +58,3 @@
 - 存储 refresh token 对应的服务端会话状态
 - 支持 refresh token 轮换（rotation）与会话撤销
 - 支持“仅当前用户全部设备下线”，不影响其他用户
-
-## 表：user_identities
-
-字段（核心）：
-
-- `id` (uuid, PK)
-- `user_id` (uuid, FK -> users.id, on delete cascade)
-- `provider_kind` (varchar, non-null，如 `oidc` / `oauth2`)
-- `provider_name` (varchar, non-null，如 `google` / `github`)
-- `provider_user_id` (varchar, non-null)
-- `provider_username` / `provider_email` (nullable)
-- `oidc_issuer` / `oidc_subject` (nullable，OIDC 预留)
-- `metadata` (jsonb)
-- `last_login_at` / `created_at` / `updated_at` (timestamptz)
-
-关键约束：
-
-- `UNIQUE (user_id, provider_kind, provider_name)`：同一用户同一 provider 只能绑定一次
-- `UNIQUE (provider_kind, provider_name, provider_user_id)`：同一外部账号只能归属一个用户

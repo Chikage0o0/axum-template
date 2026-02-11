@@ -645,163 +645,6 @@
         ]
       }
     },
-    "/api/v1/users/{user_id}/identities": {
-      "post": {
-        "tags": [
-          "users"
-        ],
-        "operationId": "create_user_identity_handler",
-        "parameters": [
-          {
-            "name": "user_id",
-            "in": "path",
-            "description": "用户 ID",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateUserIdentityRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "description": "绑定外部账号",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserIdentityResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "请求参数错误",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseBody"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "未登录或 Token 无效",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseBody"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "用户不存在",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseBody"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "服务器内部错误",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseBody"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer_auth": []
-          }
-        ]
-      }
-    },
-    "/api/v1/users/{user_id}/identities/{identity_id}": {
-      "delete": {
-        "tags": [
-          "users"
-        ],
-        "operationId": "delete_user_identity_handler",
-        "parameters": [
-          {
-            "name": "user_id",
-            "in": "path",
-            "description": "用户 ID",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "identity_id",
-            "in": "path",
-            "description": "身份连接 ID",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "删除成功"
-          },
-          "401": {
-            "description": "未登录或 Token 无效",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseBody"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "身份连接不存在",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseBody"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "服务器内部错误",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseBody"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer_auth": []
-          }
-        ]
-      }
-    },
     "/api/v1/users/{user_id}/restore": {
       "post": {
         "tags": [
@@ -926,66 +769,6 @@
           }
         }
       },
-      "CreateUserIdentityRequest": {
-        "type": "object",
-        "required": [
-          "provider_kind",
-          "provider_name",
-          "provider_user_id"
-        ],
-        "properties": {
-          "metadata": {},
-          "oidc_issuer": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 2048,
-            "minLength": 1
-          },
-          "oidc_subject": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 256,
-            "minLength": 1
-          },
-          "provider_email": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 320,
-            "minLength": 1
-          },
-          "provider_kind": {
-            "type": "string",
-            "example": "oidc",
-            "maxLength": 32,
-            "minLength": 1
-          },
-          "provider_name": {
-            "type": "string",
-            "example": "google",
-            "maxLength": 64,
-            "minLength": 1
-          },
-          "provider_user_id": {
-            "type": "string",
-            "maxLength": 256,
-            "minLength": 1
-          },
-          "provider_username": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 256,
-            "minLength": 1
-          }
-        }
-      },
       "CreateUserRequest": {
         "type": "object",
         "required": [
@@ -1010,12 +793,6 @@
             "type": "string",
             "maxLength": 320,
             "minLength": 3
-          },
-          "identities": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CreateUserIdentityRequest"
-            }
           },
           "metadata": {},
           "phone": {
@@ -1231,78 +1008,6 @@
           }
         }
       },
-      "UserIdentityResponse": {
-        "type": "object",
-        "required": [
-          "id",
-          "user_id",
-          "provider_kind",
-          "provider_name",
-          "provider_user_id",
-          "metadata",
-          "created_at",
-          "updated_at"
-        ],
-        "properties": {
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "last_login_at": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
-          },
-          "metadata": {},
-          "oidc_issuer": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "oidc_subject": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "provider_email": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "provider_kind": {
-            "type": "string"
-          },
-          "provider_name": {
-            "type": "string"
-          },
-          "provider_user_id": {
-            "type": "string"
-          },
-          "provider_username": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "user_id": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
-      },
       "UserResponse": {
         "type": "object",
         "required": [
@@ -1311,7 +1016,6 @@
           "email",
           "is_active",
           "metadata",
-          "identities",
           "created_at",
           "updated_at"
         ],
@@ -1335,12 +1039,6 @@
           "id": {
             "type": "string",
             "format": "uuid"
-          },
-          "identities": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/UserIdentityResponse"
-            }
           },
           "is_active": {
             "type": "boolean"
@@ -1387,7 +1085,7 @@
     },
     {
       "name": "users",
-      "description": "用户与多 provider 账号连接管理"
+      "description": "用户管理"
     }
   ]
 }
