@@ -53,23 +53,6 @@ export const PatchSettingsRequest = z
   })
   .partial()
   .passthrough();
-export const UserIdentityResponse = z
-  .object({
-    created_at: z.string().datetime({ offset: true }),
-    id: z.string().uuid(),
-    last_login_at: z.union([z.string(), z.null()]).optional(),
-    metadata: z.unknown(),
-    oidc_issuer: z.union([z.string(), z.null()]).optional(),
-    oidc_subject: z.union([z.string(), z.null()]).optional(),
-    provider_email: z.union([z.string(), z.null()]).optional(),
-    provider_kind: z.string(),
-    provider_name: z.string(),
-    provider_user_id: z.string(),
-    provider_username: z.union([z.string(), z.null()]).optional(),
-    updated_at: z.string().datetime({ offset: true }),
-    user_id: z.string().uuid(),
-  })
-  .passthrough();
 export const UserResponse = z
   .object({
     avatar_url: z.union([z.string(), z.null()]).optional(),
@@ -77,7 +60,6 @@ export const UserResponse = z
     display_name: z.string(),
     email: z.string(),
     id: z.string().uuid(),
-    identities: z.array(UserIdentityResponse),
     is_active: z.boolean(),
     metadata: z.unknown(),
     phone: z.union([z.string(), z.null()]).optional(),
@@ -85,24 +67,11 @@ export const UserResponse = z
     username: z.union([z.string(), z.null()]).optional(),
   })
   .passthrough();
-export const CreateUserIdentityRequest = z
-  .object({
-    metadata: z.unknown().optional(),
-    oidc_issuer: z.union([z.string(), z.null()]).optional(),
-    oidc_subject: z.union([z.string(), z.null()]).optional(),
-    provider_email: z.union([z.string(), z.null()]).optional(),
-    provider_kind: z.string().min(1).max(32),
-    provider_name: z.string().min(1).max(64),
-    provider_user_id: z.string().min(1).max(256),
-    provider_username: z.union([z.string(), z.null()]).optional(),
-  })
-  .passthrough();
 export const CreateUserRequest = z
   .object({
     avatar_url: z.union([z.string(), z.null()]).optional(),
     display_name: z.string().min(1).max(128),
     email: z.string().min(3).max(320),
-    identities: z.array(CreateUserIdentityRequest).optional(),
     metadata: z.unknown().optional(),
     phone: z.union([z.string(), z.null()]).optional(),
     username: z.union([z.string(), z.null()]).optional(),

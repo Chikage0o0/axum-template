@@ -31,49 +31,6 @@ export interface CreateSessionResponse {
   token: string;
 }
 
-export interface CreateUserIdentityRequest {
-  metadata?: unknown;
-  /**
-   * @minLength 1
-   * @maxLength 2048
-   * @nullable
-   */
-  oidc_issuer?: string | null;
-  /**
-   * @minLength 1
-   * @maxLength 256
-   * @nullable
-   */
-  oidc_subject?: string | null;
-  /**
-   * @minLength 1
-   * @maxLength 320
-   * @nullable
-   */
-  provider_email?: string | null;
-  /**
-   * @minLength 1
-   * @maxLength 32
-   */
-  provider_kind: string;
-  /**
-   * @minLength 1
-   * @maxLength 64
-   */
-  provider_name: string;
-  /**
-   * @minLength 1
-   * @maxLength 256
-   */
-  provider_user_id: string;
-  /**
-   * @minLength 1
-   * @maxLength 256
-   * @nullable
-   */
-  provider_username?: string | null;
-}
-
 export interface CreateUserRequest {
   /**
    * @minLength 1
@@ -91,7 +48,6 @@ export interface CreateUserRequest {
    * @maxLength 320
    */
   email: string;
-  identities?: CreateUserIdentityRequest[];
   metadata?: unknown;
   /**
    * @minLength 1
@@ -212,27 +168,6 @@ export interface SettingsResponse {
   integrations: IntegrationsSettings;
 }
 
-export interface UserIdentityResponse {
-  created_at: string;
-  id: string;
-  /** @nullable */
-  last_login_at?: string | null;
-  metadata: unknown;
-  /** @nullable */
-  oidc_issuer?: string | null;
-  /** @nullable */
-  oidc_subject?: string | null;
-  /** @nullable */
-  provider_email?: string | null;
-  provider_kind: string;
-  provider_name: string;
-  provider_user_id: string;
-  /** @nullable */
-  provider_username?: string | null;
-  updated_at: string;
-  user_id: string;
-}
-
 export interface UserResponse {
   /** @nullable */
   avatar_url?: string | null;
@@ -240,7 +175,6 @@ export interface UserResponse {
   display_name: string;
   email: string;
   id: string;
-  identities: UserIdentityResponse[];
   is_active: boolean;
   metadata: unknown;
   /** @nullable */
@@ -496,52 +430,6 @@ export const patchUserHandler = async (userId: string,
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
       patchUserRequest,)
-  }
-);}
-
-
-
-export const getCreateUserIdentityHandlerUrl = (userId: string,) => {
-
-
-  
-
-  return `/api/v1/users/${userId}/identities`
-}
-
-export const createUserIdentityHandler = async (userId: string,
-    createUserIdentityRequest: CreateUserIdentityRequest, options?: RequestInit): Promise<UserIdentityResponse> => {
-  
-  return apiClient<UserIdentityResponse>(getCreateUserIdentityHandlerUrl(userId),
-  {      
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      createUserIdentityRequest,)
-  }
-);}
-
-
-
-export const getDeleteUserIdentityHandlerUrl = (userId: string,
-    identityId: string,) => {
-
-
-  
-
-  return `/api/v1/users/${userId}/identities/${identityId}`
-}
-
-export const deleteUserIdentityHandler = async (userId: string,
-    identityId: string, options?: RequestInit): Promise<void> => {
-  
-  return apiClient<void>(getDeleteUserIdentityHandlerUrl(userId,identityId),
-  {      
-    ...options,
-    method: 'DELETE'
-    
-    
   }
 );}
 

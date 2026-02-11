@@ -146,7 +146,6 @@
     "avatar_url": null,
     "is_active": true,
     "metadata": {},
-    "identities": [],
     "created_at": "2026-02-06T09:00:00Z",
     "updated_at": "2026-02-06T09:00:00Z"
   }
@@ -163,27 +162,15 @@
 {
   "username": "alice",
   "display_name": "Alice",
-  "email": "alice@example.com",
-  "identities": [
-    {
-      "provider_kind": "oidc",
-      "provider_name": "google",
-      "provider_user_id": "11335577",
-      "oidc_issuer": "https://accounts.google.com",
-      "oidc_subject": "sub_xxx"
-    }
-  ]
+  "email": "alice@example.com"
 }
 ```
 
 说明：
 
-- `username` 为可选字段；仅外部身份登录场景可不填
+- `username` 为可选字段
 - 若提供 `username`，其值不能与其他未删除用户的 `email` 或 `phone` 相同
 - `username` 只能包含字母、数字、下划线，且必须至少包含一个字母，不能包含 `@`
-- `identities` 支持多 provider（如 `oidc/google`、`oauth2/github`）
-- 同一用户内，`provider_kind + provider_name` 不能重复
-- 若提供 `oidc_subject`，必须同时提供 `oidc_issuer`
 
 ### 更新用户基本信息
 
@@ -194,18 +181,6 @@
 其中 `username` 更新时同样受限：不能与其他未删除用户的 `email` 或 `phone` 相同，且格式规则与创建一致。
 
 注意：至少需要提供一个可更新字段，否则返回参数错误。
-
-### 绑定外部账号
-
-`POST /api/v1/users/{user_id}/identities`
-
-请求体与 `CreateUserRequest.identities[]` 元素一致；`provider_kind` / `provider_name` 会按小写归一化。
-
-### 删除外部账号绑定
-
-`DELETE /api/v1/users/{user_id}/identities/{identity_id}`
-
-响应：`204 No Content`。
 
 ### 逻辑删除用户
 

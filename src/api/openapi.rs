@@ -41,7 +41,7 @@ impl Modify for SecurityAddon {
         (name = "sessions", description = "认证与会话"),
         (name = "settings", description = "运行期配置"),
         (name = "security", description = "安全与凭证管理"),
-        (name = "users", description = "用户与多 provider 账号连接管理")
+        (name = "users", description = "用户管理")
     ),
     modifiers(&SecurityAddon),
     paths(
@@ -56,9 +56,7 @@ impl Modify for SecurityAddon {
         users::create_user_handler,
         users::patch_user_handler,
         users::delete_user_handler,
-        users::restore_user_handler,
-        users::create_user_identity_handler,
-        users::delete_user_identity_handler
+        users::restore_user_handler
     ),
     components(schemas(
         ErrorResponseBody,
@@ -72,10 +70,8 @@ impl Modify for SecurityAddon {
         settings::PatchIntegrationsSettings,
         security_handlers::PatchCurrentUserPasswordRequest,
         users::UserResponse,
-        users::UserIdentityResponse,
         users::CreateUserRequest,
-        users::PatchUserRequest,
-        users::CreateUserIdentityRequest
+        users::PatchUserRequest
     ))
 )]
 pub struct ApiDoc;
@@ -97,18 +93,10 @@ mod tests {
             .paths
             .paths
             .contains_key("/api/v1/users/{user_id}/restore"));
-        assert!(doc
+        assert!(!doc
             .paths
             .paths
             .contains_key("/api/v1/users/{user_id}/identities"));
-    }
-
-    #[test]
-    fn should_expose_identity_request_schema() {
-        let doc = ApiDoc::openapi();
-        let schemas = doc.components.expect("openapi components 应存在").schemas;
-
-        assert!(schemas.contains_key("CreateUserIdentityRequest"));
     }
 
     #[test]
