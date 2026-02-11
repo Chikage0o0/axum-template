@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\nSELECT id, username, display_name, email, password_hash, is_active, auth_version\nFROM users\nWHERE deleted_at IS NULL\n  AND (\n    username = $1\n    OR email = $1\n    OR phone = $1\n  )\nLIMIT 2\n        ",
+  "query": "\nSELECT id, username, role, display_name, email, password_hash, is_active, auth_version\nFROM users\nWHERE deleted_at IS NULL\n  AND (\n    username = $1\n    OR email = $1\n    OR phone = $1\n  )\nLIMIT 2\n        ",
   "describe": {
     "columns": [
       {
@@ -15,26 +15,31 @@
       },
       {
         "ordinal": 2,
+        "name": "role",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
         "name": "display_name",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "email",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "password_hash",
         "type_info": "Text"
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "is_active",
         "type_info": "Bool"
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "auth_version",
         "type_info": "Int4"
       }
@@ -49,10 +54,11 @@
       true,
       false,
       false,
+      false,
       true,
       false,
       false
     ]
   },
-  "hash": "db3a9cbc4c0d02d1677711ae94cb93156e46aea2bd906f7696f150466c5cbfeb"
+  "hash": "691ca8da7161d7c29d9e66e7a8d7190286b7b7568d5ca37b4097922a2c20e37b"
 }

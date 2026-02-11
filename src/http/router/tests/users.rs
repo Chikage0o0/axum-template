@@ -396,3 +396,62 @@ async fn username_should_reject_special_symbols_and_require_letters(pool: sqlx::
 
     cleanup_test_users(&pool, &created_ids).await;
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn user_can_patch_me_but_cannot_patch_others(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let user_a_name = format!("self_patch_user_a_{}", Uuid::new_v4().simple());
+    let user_a_email = format!("{user_a_name}@example.invalid");
+    let user_a_password = "SelfPatchPassword#A123";
+    let user_a_id =
+        create_or_update_user_with_password(&pool, &user_a_name, &user_a_email, user_a_password)
+            .await;
+
+    let user_b_name = format!("self_patch_user_b_{}", Uuid::new_v4().simple());
+    let user_b_email = format!("{user_b_name}@example.invalid");
+    let user_b_id =
+        create_or_update_user_with_password(&pool, &user_b_name, &user_b_email, "UserBPwd#A123")
+            .await;
+
+    let (user_a_token, _) = login_and_get_tokens(&server, &user_a_name, user_a_password).await;
+
+    let patch_me_response = request_json(
+        &server,
+        Method::PATCH,
+        "/api/v1/users/me",
+        Some(&user_a_token),
+        None,
+        Some(json!({
+            "display_name": "Self Updated",
+            "email": format!("me_updated_{}@example.invalid", Uuid::new_v4().simple()),
+        })),
+    )
+    .await;
+    assert_eq!(patch_me_response.status_code(), StatusCode::OK);
+    let patch_me_body = patch_me_response.json::<Value>();
+    assert_eq!(
+        patch_me_body.get("id").and_then(Value::as_str),
+        Some(user_a_id.to_string().as_str())
+    );
+
+    let patch_other_response = request_json(
+        &server,
+        Method::PATCH,
+        &format!("/api/v1/users/{user_b_id}"),
+        Some(&user_a_token),
+        None,
+        Some(json!({
+            "display_name": "Should Not Update",
+        })),
+    )
+    .await;
+    assert_eq!(patch_other_response.status_code(), StatusCode::FORBIDDEN);
+    let patch_other_body = patch_other_response.json::<Value>();
+    assert_eq!(
+        patch_other_body.get("code").and_then(Value::as_u64),
+        Some(2002)
+    );
+
+    cleanup_test_users(&pool, &[user_a_id, user_b_id]).await;
+}

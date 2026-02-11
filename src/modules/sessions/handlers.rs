@@ -31,6 +31,7 @@ struct SessionIssueContext {
     auth_version: i32,
     session_id: Uuid,
     username: Option<String>,
+    role: String,
     display_name: String,
     email: String,
     refresh_secret: String,
@@ -135,6 +136,7 @@ VALUES ($1, $2, $3, $4, NULL, NULL)
         auth_version: user.auth_version,
         session_id,
         username: user.username,
+        role: user.role,
         display_name: user.display_name,
         email: user.email,
         refresh_secret,
@@ -192,10 +194,12 @@ SET refresh_secret_hash = $2,
     updated_at = NOW()
 WHERE id = $1
   AND revoked_at IS NULL
+  AND refresh_secret_hash = $4
         "#,
         session_id,
         next_refresh_secret_hash,
         next_refresh_expires_at,
+        session.refresh_secret_hash,
     )
     .execute(&mut *tx)
     .await
@@ -214,6 +218,7 @@ WHERE id = $1
         auth_version: session.auth_version,
         session_id,
         username: session.username,
+        role: session.role,
         display_name: session.display_name,
         email: session.email,
         refresh_secret: next_refresh_secret,
@@ -274,11 +279,7 @@ fn build_login_or_refresh_response(
         username: ctx.username.clone(),
         display_name: Some(ctx.display_name),
         email: Some(ctx.email),
-        role: if ctx.username.as_deref() == Some("admin") {
-            "admin".to_string()
-        } else {
-            "user".to_string()
-        },
+        role: ctx.role,
     };
 
     let token = encode(
@@ -392,6 +393,7 @@ fn extract_cookie_value(cookie_header: &str, name: &str) -> Option<String> {
 struct LoginUserRow {
     id: Uuid,
     username: Option<String>,
+    role: String,
     display_name: String,
     email: String,
     password_hash: Option<String>,
@@ -403,7 +405,7 @@ async fn load_login_user(state: &AppState, identifier: &str) -> Result<LoginUser
     let mut users = sqlx::query_as!(
         LoginUserRow,
         r#"
-SELECT id, username, display_name, email, password_hash, is_active, auth_version
+SELECT id, username, role, display_name, email, password_hash, is_active, auth_version
 FROM users
 WHERE deleted_at IS NULL
   AND (
@@ -430,6 +432,7 @@ LIMIT 2
 struct AuthSessionRow {
     user_id: Uuid,
     username: Option<String>,
+    role: String,
     display_name: String,
     email: String,
     user_is_active: bool,
@@ -446,6 +449,7 @@ async fn load_auth_session(state: &AppState, session_id: Uuid) -> Result<AuthSes
 SELECT
     s.user_id,
     u.username,
+    u.role,
     u.display_name,
     u.email,
     u.is_active AS user_is_active,

@@ -86,7 +86,7 @@
 
 ### 更新配置
 
-`PATCH /api/v1/settings`
+`PATCH /api/v1/settings`（仅 `admin` 可调用）
 
 请求支持部分更新：
 
@@ -95,7 +95,10 @@
 - `integrations.example_api_base`（非空字符串）
 - `integrations.example_api_key`（提供时必须非空；不提供表示不修改）
 
-说明：更新后会写入 `system_config` 并立即热更新内存配置。
+说明：
+
+- 非 `admin` 调用返回 `403`（错误码 `2002`）
+- 更新后会写入 `system_config` 并立即热更新内存配置
 
 ## 安全
 
@@ -117,13 +120,25 @@
 
 以下接口均需要 Bearer Token。
 
-权限说明：除 `GET /api/v1/users/me` 外，用户管理接口均要求 `admin` 角色，非管理员返回 `403`（错误码 `2002`）。
+权限说明：除 `GET /api/v1/users/me` 与 `PATCH /api/v1/users/me` 外，用户管理接口均要求 `admin` 角色，非管理员返回 `403`（错误码 `2002`）。
 
 ### 获取当前登录用户
 
 `GET /api/v1/users/me`
 
 返回当前 Bearer Token 对应用户信息，字段结构与 `GET /api/v1/users` 列表项一致。
+
+### 更新当前登录用户
+
+`PATCH /api/v1/users/me`
+
+支持按需更新：`display_name`、`email`、`phone`、`avatar_url`。
+
+说明：
+
+- 仅允许更新当前登录用户自己的资料
+- 请求体启用严格字段校验，拒绝 `role`、`is_active`、`metadata`、`username` 等非白名单字段
+- 至少需要提供一个可更新字段，否则返回参数错误
 
 ### 获取用户列表
 

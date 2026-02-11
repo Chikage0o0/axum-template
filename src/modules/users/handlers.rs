@@ -127,6 +127,46 @@ pub struct PatchUserRequest {
     pub metadata: Option<serde_json::Value>,
 }
 
+#[derive(Debug, Deserialize, ToSchema, Validate)]
+#[serde(deny_unknown_fields)]
+pub struct PatchCurrentUserRequest {
+    #[schema(min_length = 1, max_length = 128)]
+    #[serde(
+        default,
+        deserialize_with = "crate::api::serde_helpers::deserialize_opt_trimmed_string"
+    )]
+    #[garde(custom(crate::api::garde_helpers::opt_string_trim_non_empty))]
+    #[garde(length(max = 128))]
+    pub display_name: Option<String>,
+
+    #[schema(min_length = 3, max_length = 320)]
+    #[serde(
+        default,
+        deserialize_with = "crate::api::serde_helpers::deserialize_opt_trimmed_string"
+    )]
+    #[garde(custom(crate::api::garde_helpers::opt_string_basic_email))]
+    #[garde(length(max = 320))]
+    pub email: Option<String>,
+
+    #[schema(min_length = 1, max_length = 32)]
+    #[serde(
+        default,
+        deserialize_with = "crate::api::serde_helpers::deserialize_opt_trimmed_string"
+    )]
+    #[garde(custom(crate::api::garde_helpers::opt_string_trim_non_empty))]
+    #[garde(length(max = 32))]
+    pub phone: Option<String>,
+
+    #[schema(min_length = 1, max_length = 2048)]
+    #[serde(
+        default,
+        deserialize_with = "crate::api::serde_helpers::deserialize_opt_trimmed_string"
+    )]
+    #[garde(custom(crate::api::garde_helpers::opt_string_trim_non_empty))]
+    #[garde(length(max = 2048))]
+    pub avatar_url: Option<String>,
+}
+
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct ListUsersQuery {
     #[serde(default)]
@@ -159,6 +199,31 @@ pub async fn get_current_user_handler(
     State(state): State<AppState>,
 ) -> Result<Json<UserResponse>, AppError> {
     let user = get_user_by_id(&state.db, current_user.user_id).await?;
+    Ok(Json(user))
+}
+
+#[utoipa::path(
+    patch,
+    path = "/api/v1/users/me",
+    tag = "users",
+    request_body = PatchCurrentUserRequest,
+    responses(
+        (status = 200, description = "更新当前用户", body = UserResponse),
+        (status = 400, description = "请求参数错误", body = crate::api::openapi::ErrorResponseBody),
+        (status = 401, description = "未登录或 Token 无效", body = crate::api::openapi::ErrorResponseBody),
+        (status = 404, description = "当前用户不存在", body = crate::api::openapi::ErrorResponseBody),
+        (status = 500, description = "服务器内部错误", body = crate::api::openapi::ErrorResponseBody)
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn patch_current_user_handler(
+    Extension(current_user): Extension<CurrentUser>,
+    State(state): State<AppState>,
+    crate::api::validation::ValidatedJson(payload): crate::api::validation::ValidatedJson<
+        PatchCurrentUserRequest,
+    >,
+) -> Result<Json<UserResponse>, AppError> {
+    let user = patch_current_user(&state.db, current_user.user_id, payload).await?;
     Ok(Json(user))
 }
 
@@ -561,6 +626,67 @@ RETURNING
     .fetch_optional(db)
     .await
     .map_err(|e| map_user_db_error("更新用户失败", e))?
+    .ok_or_else(|| AppError::NotFound(format!("用户不存在: {user_id}")))?;
+
+    Ok(UserResponse {
+        id: row.id,
+        username: row.username,
+        display_name: row.display_name,
+        email: row.email,
+        phone: row.phone,
+        avatar_url: row.avatar_url,
+        is_active: row.is_active,
+        metadata: row.metadata,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+    })
+}
+
+async fn patch_current_user(
+    db: &DbPool,
+    user_id: Uuid,
+    payload: PatchCurrentUserRequest,
+) -> Result<UserResponse, AppError> {
+    if payload.display_name.is_none()
+        && payload.email.is_none()
+        && payload.phone.is_none()
+        && payload.avatar_url.is_none()
+    {
+        return Err(AppError::validation("至少需要提供一个可更新字段"));
+    }
+
+    let row = sqlx::query_as!(
+        UserRow,
+        r#"
+UPDATE users
+SET
+    display_name = COALESCE($2, display_name),
+    email = COALESCE($3, email),
+    phone = COALESCE($4, phone),
+    avatar_url = COALESCE($5, avatar_url),
+    updated_at = NOW()
+WHERE id = $1
+RETURNING
+    id,
+    username,
+    display_name,
+    email,
+    phone,
+    avatar_url,
+    is_active,
+    metadata,
+    created_at,
+    updated_at
+        "#,
+        user_id,
+        payload.display_name,
+        payload.email,
+        payload.phone,
+        payload.avatar_url,
+    )
+    .fetch_optional(db)
+    .await
+    .map_err(|e| map_user_db_error("更新当前用户失败", e))?
     .ok_or_else(|| AppError::NotFound(format!("用户不存在: {user_id}")))?;
 
     Ok(UserResponse {

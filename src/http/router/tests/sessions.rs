@@ -1,5 +1,6 @@
 use super::*;
 
+use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde_json::Value;
 
 #[sqlx::test(migrations = "./migrations")]
@@ -118,6 +119,115 @@ async fn session_login_should_accept_username_email_and_phone_identifier(pool: s
             "登录响应应包含 token"
         );
     }
+
+    cleanup_test_users(&pool, &[user_id]).await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn login_should_issue_role_from_db_not_username(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let username = format!("admin_like_{}", Uuid::new_v4().simple());
+    let email = format!("{username}@example.invalid");
+    let password = "RoleByDbPassword#A123";
+    let user_id = create_or_update_user_with_password(&pool, &username, &email, password).await;
+
+    sqlx::query!("UPDATE users SET role = 'user' WHERE id = $1", user_id)
+        .execute(&pool)
+        .await
+        .expect("设置测试用户角色失败");
+
+    let (access_token, _) = login_and_get_tokens(&server, &username, password).await;
+    let token_data = decode::<crate::api::auth::Claims>(
+        &access_token,
+        &DecodingKey::from_secret(E2E_JWT_SECRET.as_bytes()),
+        &Validation::default(),
+    )
+    .expect("解码 access token 失败");
+
+    assert_eq!(token_data.claims.role, "user");
+
+    cleanup_test_users(&pool, &[user_id]).await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn role_change_should_invalidate_old_access_token(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let username = format!("role_change_user_{}", Uuid::new_v4().simple());
+    let email = format!("{username}@example.invalid");
+    let password = "RoleChangePassword#A123";
+    let user_id = create_or_update_user_with_password(&pool, &username, &email, password).await;
+
+    sqlx::query!("UPDATE users SET role = 'user' WHERE id = $1", user_id)
+        .execute(&pool)
+        .await
+        .expect("设置初始 role 失败");
+
+    let (access_token, _) = login_and_get_tokens(&server, &username, password).await;
+
+    sqlx::query!(
+        "UPDATE users SET role = 'admin', auth_version = auth_version + 1 WHERE id = $1",
+        user_id
+    )
+    .execute(&pool)
+    .await
+    .expect("更新 role 并 bump auth_version 失败");
+
+    let me_response = request_json(
+        &server,
+        Method::GET,
+        "/api/v1/users/me",
+        Some(&access_token),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(me_response.status_code(), StatusCode::UNAUTHORIZED);
+    let body = me_response.json::<Value>();
+    assert_eq!(body.get("code").and_then(Value::as_u64), Some(1001));
+
+    cleanup_test_users(&pool, &[user_id]).await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn concurrent_refresh_with_same_cookie_should_only_succeed_once(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let username = format!("refresh_race_user_{}", Uuid::new_v4().simple());
+    let email = format!("{username}@example.invalid");
+    let password = "RefreshRacePassword#A123";
+    let user_id = create_or_update_user_with_password(&pool, &username, &email, password).await;
+
+    let (_, refresh_cookie) = login_and_get_tokens(&server, &username, password).await;
+
+    let req_a = request_json(
+        &server,
+        Method::POST,
+        "/api/v1/sessions/refresh",
+        None,
+        Some(&refresh_cookie),
+        None,
+    );
+    let req_b = request_json(
+        &server,
+        Method::POST,
+        "/api/v1/sessions/refresh",
+        None,
+        Some(&refresh_cookie),
+        None,
+    );
+    let (resp_a, resp_b) = tokio::join!(req_a, req_b);
+
+    let statuses = [resp_a.status_code(), resp_b.status_code()];
+    let success_count = statuses.iter().filter(|s| **s == StatusCode::OK).count();
+    let unauthorized_count = statuses
+        .iter()
+        .filter(|s| **s == StatusCode::UNAUTHORIZED)
+        .count();
+
+    assert_eq!(success_count, 1, "并发刷新应仅成功一次");
+    assert_eq!(unauthorized_count, 1, "并发刷新应有一次返回 401");
 
     cleanup_test_users(&pool, &[user_id]).await;
 }

@@ -106,6 +106,33 @@ export interface PatchCurrentUserPasswordRequest {
   new_password: string;
 }
 
+export interface PatchCurrentUserRequest {
+  /**
+   * @minLength 1
+   * @maxLength 2048
+   * @nullable
+   */
+  avatar_url?: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 128
+   * @nullable
+   */
+  display_name?: string | null;
+  /**
+   * @minLength 3
+   * @maxLength 320
+   * @nullable
+   */
+  email?: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 32
+   * @nullable
+   */
+  phone?: string | null;
+}
+
 export interface PatchIntegrationsSettings {
   /**
    * @minLength 1
@@ -386,6 +413,28 @@ export const getCurrentUserHandler = async ( options?: RequestInit): Promise<Use
     method: 'GET'
     
     
+  }
+);}
+
+
+
+export const getPatchCurrentUserHandlerUrl = () => {
+
+
+  
+
+  return `/api/v1/users/me`
+}
+
+export const patchCurrentUserHandler = async (patchCurrentUserRequest: PatchCurrentUserRequest, options?: RequestInit): Promise<UserResponse> => {
+  
+  return apiClient<UserResponse>(getPatchCurrentUserHandlerUrl(),
+  {      
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      patchCurrentUserRequest,)
   }
 );}
 

@@ -1,5 +1,6 @@
 use super::*;
 
+use axum::response::IntoResponse;
 use serde_json::{json, Value};
 
 #[sqlx::test(migrations = "./migrations")]
@@ -92,4 +93,30 @@ async fn password_change_should_only_invalidate_current_user_sessions(pool: sqlx
     assert_eq!(refresh_b_old_response.status_code(), StatusCode::OK);
 
     cleanup_test_users(&pool, &[user_a_id, user_b_id]).await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn internal_error_should_not_expose_raw_database_message(_pool: sqlx::PgPool) {
+    let response = AppError::InternalError(
+        "数据库执行失败: duplicate key value violates unique constraint users_email_key"
+            .to_string(),
+    )
+    .into_response();
+
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+    let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("读取错误响应 body 失败");
+    let body: Value = serde_json::from_slice(&body_bytes).expect("解析错误响应 JSON 失败");
+
+    assert_eq!(body.get("code").and_then(Value::as_u64), Some(5000));
+    let message = body
+        .get("message")
+        .and_then(Value::as_str)
+        .expect("错误响应缺少 message");
+    let message_lower = message.to_ascii_lowercase();
+    assert!(!message_lower.contains("sql"));
+    assert!(!message_lower.contains("duplicate"));
+    assert!(!message_lower.contains("constraint"));
 }
