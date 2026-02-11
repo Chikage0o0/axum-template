@@ -2,7 +2,11 @@
   import { AvatarBeam } from "svelte-boring-avatars";
   import * as Avatar from "$lib/shadcn/components/ui/avatar/index.js";
   import { cn } from "$lib/shadcn/utils";
-  import { avatarBeamColors, buildAvatarSeed } from "$lib/shared/utils/avatar";
+  import {
+    avatarBeamColors,
+    buildAvatarSeed,
+    normalizeAvatarBeamSize,
+  } from "$lib/shared/utils/avatar";
 
   let {
     src = "",
@@ -10,6 +14,7 @@
     email = "",
     displayName = "",
     id = "",
+    beamSize = 32,
     class: className = "",
   }: {
     src?: string;
@@ -17,11 +22,13 @@
     email?: string;
     displayName?: string;
     id?: string;
+    beamSize?: number;
     class?: string;
   } = $props();
 
   const seed = $derived.by(() => buildAvatarSeed({ email, displayName, id }));
   const imageSrc = $derived(src.trim());
+  const normalizedBeamSize = $derived.by(() => normalizeAvatarBeamSize(beamSize));
 </script>
 
 <Avatar.Root class={cn("size-8 shrink-0 rounded-full", className)}>
@@ -30,7 +37,7 @@
   {/if}
   <Avatar.Fallback class="rounded-full p-0">
     {#key seed}
-      <AvatarBeam size={32} name={seed} square={true} colors={avatarBeamColors} />
+      <AvatarBeam size={normalizedBeamSize} name={seed} square={true} colors={avatarBeamColors} />
     {/key}
   </Avatar.Fallback>
 </Avatar.Root>

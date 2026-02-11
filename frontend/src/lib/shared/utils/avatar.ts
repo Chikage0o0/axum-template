@@ -24,3 +24,14 @@ export function buildAvatarSeed(input: BuildAvatarSeedInput): string {
 
   return "unknown-user";
 }
+
+export function normalizeAvatarBeamSize(size?: number): number {
+  if (typeof size !== "number" || !Number.isFinite(size)) {
+    return 32;
+  }
+
+  const normalized = Math.floor(size);
+  if (normalized < 16) return 16;
+  if (normalized > 128) return 128;
+  return normalized;
+}

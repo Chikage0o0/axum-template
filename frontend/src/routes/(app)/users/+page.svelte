@@ -19,12 +19,14 @@
   import { useFieldErrors } from "$lib/shared/forms/use-field-errors.svelte";
   import { auth } from "$lib/features/auth/state/auth";
   import { buildUserPatchPayload } from "$lib/features/auth/model/user-helpers";
+  import { buildUserDetailRows, toUserStatusLabel } from "$lib/features/users/model/user-detail";
   import * as AlertDialog from "$lib/shadcn/components/ui/alert-dialog/index.js";
   import { Badge } from "$lib/shadcn/components/ui/badge/index.js";
   import * as Card from "$lib/shadcn/components/ui/card/index.js";
   import * as Empty from "$lib/shadcn/components/ui/empty/index.js";
   import * as Field from "$lib/shadcn/components/ui/field/index.js";
   import { Input } from "$lib/shadcn/components/ui/input/index.js";
+  import { Button } from "$lib/shadcn/components/ui/button/index.js";
   import * as Sheet from "$lib/shadcn/components/ui/sheet/index.js";
   import { Skeleton } from "$lib/shadcn/components/ui/skeleton/index.js";
   import { Switch } from "$lib/shadcn/components/ui/switch/index.js";
@@ -69,6 +71,9 @@
   let selectedUser = $state<UserResponse | null>(null);
   let draft = $state<UserFormDraft>(emptyDraft());
 
+  let detailSheetOpen = $state(false);
+  let detailUser = $state<UserResponse | null>(null);
+
   let deletingUserId = $state<string | null>(null);
 
   // AlertDialog 状态
@@ -78,6 +83,7 @@
   const sheetTitle = $derived(sheetMode === "create" ? "新增用户" : "编辑用户");
   const sheetSubmitLabel = $derived(sheetMode === "create" ? "创建用户" : "保存修改");
   const activeUserCount = $derived(users.filter((user) => user.is_active).length);
+  const detailRows = $derived(detailUser ? buildUserDetailRows(detailUser) : []);
 
   function isSelfRow(userId: string): boolean {
     return $auth.user?.sub === userId;
@@ -120,6 +126,16 @@
     selectedUser = null;
     draft = emptyDraft();
     sheetMode = "create";
+  }
+
+  function openDetailSheet(user: UserResponse) {
+    detailUser = user;
+    detailSheetOpen = true;
+  }
+
+  function closeDetailSheet() {
+    detailSheetOpen = false;
+    detailUser = null;
   }
 
   async function reloadUsers() {
@@ -275,6 +291,12 @@
   onMount(() => {
     void reloadUsers();
   });
+
+  $effect(() => {
+    if (!detailSheetOpen && detailUser) {
+      detailUser = null;
+    }
+  });
 </script>
 
 <div class="content-flow space-y-6">
@@ -354,16 +376,30 @@
                 }`}
               >
                 <div class="flex items-start gap-3">
-                  <UserAvatar
-                    class="size-9"
-                    src={user.avatar_url ?? ""}
-                    alt={user.display_name}
-                    email={user.email}
-                    displayName={user.display_name}
-                    id={user.id}
-                  />
+                  <button
+                    type="button"
+                    class="shrink-0 rounded-full focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2"
+                    onclick={() => openDetailSheet(user)}
+                    aria-label={`查看 ${user.display_name} 的用户详情`}
+                  >
+                    <UserAvatar
+                      class="size-9"
+                      beamSize={36}
+                      src={user.avatar_url ?? ""}
+                      alt={user.display_name}
+                      email={user.email}
+                      displayName={user.display_name}
+                      id={user.id}
+                    />
+                  </button>
                   <div class="min-w-0 flex-1">
-                    <TruncateText text={user.display_name} class="font-medium leading-tight" />
+                    <button
+                      type="button"
+                      class="min-w-0 rounded-sm text-left focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2"
+                      onclick={() => openDetailSheet(user)}
+                    >
+                      <TruncateText text={user.display_name} class="font-medium leading-tight" />
+                    </button>
                     <div class="mt-2 flex flex-wrap items-center gap-2">
                       {#if user.is_active}
                         <Badge class="border-success/30 bg-success/10 text-success">启用</Badge>
@@ -424,18 +460,31 @@
                   <Table.Row class={isSelfRow(user.id) ? "bg-muted/40" : "hover:bg-muted/20"}>
                     <Table.Cell>
                       <div class="flex min-w-0 items-center gap-3">
-                        <UserAvatar
-                          src={user.avatar_url ?? ""}
-                          alt={user.display_name}
-                          email={user.email}
-                          displayName={user.display_name}
-                          id={user.id}
-                        />
-                        <div class="flex min-w-0 flex-col">
-                          <TruncateText
-                            text={user.display_name}
-                            class="font-medium leading-tight"
+                        <button
+                          type="button"
+                          class="shrink-0 rounded-full focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2"
+                          onclick={() => openDetailSheet(user)}
+                          aria-label={`查看 ${user.display_name} 的用户详情`}
+                        >
+                          <UserAvatar
+                            src={user.avatar_url ?? ""}
+                            alt={user.display_name}
+                            email={user.email}
+                            displayName={user.display_name}
+                            id={user.id}
                           />
+                        </button>
+                        <div class="flex min-w-0 flex-col">
+                          <button
+                            type="button"
+                            class="min-w-0 rounded-sm text-left focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2"
+                            onclick={() => openDetailSheet(user)}
+                          >
+                            <TruncateText
+                              text={user.display_name}
+                              class="font-medium leading-tight"
+                            />
+                          </button>
                           {#if isSelfRow(user.id)}
                             <span class="text-muted-foreground text-xs">当前账号</span>
                           {/if}
@@ -474,6 +523,56 @@
     </Card.Root>
   {/if}
 </div>
+
+<!-- 用户详情抽屉 -->
+<Sheet.Root bind:open={detailSheetOpen}>
+  <Sheet.Content class="sm:max-w-lg overflow-y-auto">
+    <Sheet.Header>
+      <Sheet.Title>用户详情</Sheet.Title>
+      <Sheet.Description>查看用户基础信息与状态。</Sheet.Description>
+    </Sheet.Header>
+
+    {#if detailUser}
+      <div class="space-y-4 px-4 pb-4">
+        <div class="flex items-center gap-3 rounded-lg border bg-muted/20 p-3">
+          <UserAvatar
+            class="size-10"
+            beamSize={40}
+            src={detailUser.avatar_url ?? ""}
+            alt={detailUser.display_name}
+            email={detailUser.email}
+            displayName={detailUser.display_name}
+            id={detailUser.id}
+          />
+          <div class="min-w-0 flex-1">
+            <TruncateText text={detailUser.display_name} class="font-medium" />
+            <TruncateText text={detailUser.email} class="text-muted-foreground text-sm" />
+          </div>
+          <Badge
+            class={detailUser.is_active
+              ? "border-success/30 bg-success/10 text-success"
+              : "border-destructive/30 bg-destructive/10 text-destructive"}
+          >
+            {toUserStatusLabel(detailUser.is_active)}
+          </Badge>
+        </div>
+
+        <dl class="divide-y rounded-lg border">
+          {#each detailRows as row (row.label)}
+            <div class="grid grid-cols-[92px_minmax(0,1fr)] items-start gap-3 px-3 py-2 text-sm">
+              <dt class="text-muted-foreground">{row.label}</dt>
+              <dd class="text-right break-all">{row.value}</dd>
+            </div>
+          {/each}
+        </dl>
+      </div>
+    {/if}
+
+    <div class="flex justify-end px-4 pb-4">
+      <Button type="button" variant="outline" onclick={closeDetailSheet}>关闭</Button>
+    </div>
+  </Sheet.Content>
+</Sheet.Root>
 
 <!-- 删除确认对话框 -->
 <AlertDialog.Root bind:open={deleteDialogOpen}>
