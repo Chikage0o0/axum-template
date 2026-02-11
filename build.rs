@@ -14,7 +14,7 @@ fn main() {
         println!("cargo:rerun-if-changed=frontend/vite.config.ts");
         println!("cargo:rerun-if-changed=frontend/tsconfig.json");
         println!("cargo:rerun-if-changed=frontend/orval.config.ts");
-        println!("cargo:rerun-if-changed=frontend/svelte.config.js");
+        println!("cargo:rerun-if-changed=frontend/svelte.config.ts");
         println!("cargo:rerun-if-changed=frontend/package.json");
         println!("cargo:rerun-if-changed=frontend/bun.lock");
 

@@ -3,7 +3,7 @@ import { get } from "svelte/store";
 
 import { auth } from "./auth";
 
-function encodeBase64Url(input) {
+function encodeBase64Url(input: string): string {
   return Buffer.from(input, "utf8")
     .toString("base64")
     .replace(/\+/g, "-")
@@ -11,7 +11,7 @@ function encodeBase64Url(input) {
     .replace(/=+$/g, "");
 }
 
-function buildToken(payload) {
+function buildToken(payload: Record<string, unknown>): string {
   const header = encodeBase64Url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const body = encodeBase64Url(JSON.stringify(payload));
   return `${header}.${body}.signature`;
