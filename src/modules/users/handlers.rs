@@ -300,6 +300,9 @@ pub async fn patch_user_handler(
     >,
 ) -> Result<Json<UserResponse>, AppError> {
     ensure_admin(&current_user)?;
+    if current_user.user_id == user_id && payload.is_active == Some(false) {
+        return Err(AppError::validation("管理员不能停用自己的账号"));
+    }
     let user = patch_user(&state.db, user_id, payload).await?;
     Ok(Json(user))
 }
@@ -323,6 +326,9 @@ pub async fn delete_user_handler(
     State(state): State<AppState>,
 ) -> Result<StatusCode, AppError> {
     ensure_admin(&current_user)?;
+    if current_user.user_id == user_id {
+        return Err(AppError::validation("管理员不能删除自己的账号"));
+    }
     soft_delete_user(&state.db, user_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -407,19 +413,25 @@ ORDER BY created_at DESC
 }
 
 async fn soft_delete_user(db: &DbPool, user_id: Uuid) -> Result<(), AppError> {
+    let mut tx = db
+        .begin()
+        .await
+        .map_err(|e| AppError::InternalError(format!("开启删除用户事务失败: {e}")))?;
+
     let result = sqlx::query!(
         r#"
 UPDATE users
 SET
     deleted_at = NOW(),
     is_active = FALSE,
+    auth_version = auth_version + 1,
     updated_at = NOW()
 WHERE id = $1
   AND deleted_at IS NULL
         "#,
         user_id,
     )
-    .execute(db)
+    .execute(&mut *tx)
     .await
     .map_err(|e| AppError::InternalError(format!("逻辑删除用户失败: {e}")))?;
 
@@ -427,10 +439,34 @@ WHERE id = $1
         return Err(AppError::NotFound(format!("用户不存在或已删除: {user_id}")));
     }
 
+    sqlx::query!(
+        r#"
+UPDATE auth_sessions
+SET revoked_at = NOW(),
+    revoked_reason = COALESCE(revoked_reason, 'user_soft_deleted'),
+    updated_at = NOW()
+WHERE user_id = $1
+  AND revoked_at IS NULL
+        "#,
+        user_id,
+    )
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| AppError::InternalError(format!("删除用户后吊销会话失败: {e}")))?;
+
+    tx.commit()
+        .await
+        .map_err(|e| AppError::InternalError(format!("提交删除用户事务失败: {e}")))?;
+
     Ok(())
 }
 
 async fn restore_user(db: &DbPool, user_id: Uuid) -> Result<UserResponse, AppError> {
+    let mut tx = db
+        .begin()
+        .await
+        .map_err(|e| AppError::InternalError(format!("开启恢复用户事务失败: {e}")))?;
+
     let row = sqlx::query_as!(
         UserRow,
         r#"
@@ -438,6 +474,7 @@ UPDATE users
 SET
     deleted_at = NULL,
     is_active = TRUE,
+    auth_version = auth_version + 1,
     updated_at = NOW()
 WHERE id = $1
   AND deleted_at IS NOT NULL
@@ -455,10 +492,29 @@ RETURNING
         "#,
         user_id,
     )
-    .fetch_optional(db)
+    .fetch_optional(&mut *tx)
     .await
     .map_err(|e| map_user_db_error("恢复用户失败", e))?
     .ok_or_else(|| AppError::NotFound(format!("用户不存在或未删除: {user_id}")))?;
+
+    sqlx::query!(
+        r#"
+UPDATE auth_sessions
+SET revoked_at = NOW(),
+    revoked_reason = COALESCE(revoked_reason, 'user_restored_reauth_required'),
+    updated_at = NOW()
+WHERE user_id = $1
+  AND revoked_at IS NULL
+        "#,
+        user_id,
+    )
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| AppError::InternalError(format!("恢复用户后吊销旧会话失败: {e}")))?;
+
+    tx.commit()
+        .await
+        .map_err(|e| AppError::InternalError(format!("提交恢复用户事务失败: {e}")))?;
 
     Ok(UserResponse {
         id: row.id,

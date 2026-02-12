@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\nUPDATE auth_sessions\nSET revoked_at = NOW(),\n    revoked_reason = COALESCE(revoked_reason, 'user_soft_deleted'),\n    updated_at = NOW()\nWHERE user_id = $1\n  AND revoked_at IS NULL\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "be611b527f2b21cb99485ae20ee7019e208f5c6e30e521ff0cd63caf5f50c4f1"
+}

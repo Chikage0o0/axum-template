@@ -239,6 +239,116 @@ async fn restore_user_should_reactivate_soft_deleted_user(pool: sqlx::PgPool) {
 }
 
 #[sqlx::test(migrations = "./migrations")]
+async fn admin_should_not_be_able_to_deactivate_or_delete_self(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let admin_password = "AdminPassword#A123";
+    let admin_id = ensure_admin_user_with_password(&pool, admin_password).await;
+    let (admin_token, _) = login_and_get_tokens(&server, "admin", admin_password).await;
+
+    let deactivate_response = request_json(
+        &server,
+        Method::PATCH,
+        &format!("/api/v1/users/{admin_id}"),
+        Some(&admin_token),
+        None,
+        Some(json!({
+            "is_active": false,
+        })),
+    )
+    .await;
+    assert_eq!(deactivate_response.status_code(), StatusCode::BAD_REQUEST);
+    let deactivate_error = deactivate_response.json::<Value>();
+    assert_eq!(
+        deactivate_error.get("code").and_then(Value::as_u64),
+        Some(1000)
+    );
+
+    let delete_response = request_json(
+        &server,
+        Method::DELETE,
+        &format!("/api/v1/users/{admin_id}"),
+        Some(&admin_token),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(delete_response.status_code(), StatusCode::BAD_REQUEST);
+    let delete_error = delete_response.json::<Value>();
+    assert_eq!(delete_error.get("code").and_then(Value::as_u64), Some(1000));
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn restore_user_should_not_revive_old_session(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let admin_password = "AdminPassword#A123";
+    ensure_admin_user_with_password(&pool, admin_password).await;
+
+    let username = format!("restore_session_target_{}", Uuid::new_v4().simple());
+    let email = format!("{username}@example.invalid");
+    let password = "TargetPassword#A123";
+    let user_id = create_or_update_user_with_password(&pool, &username, &email, password).await;
+
+    let (old_access_token, old_refresh_cookie) =
+        login_and_get_tokens(&server, &username, password).await;
+    let (admin_token, _) = login_and_get_tokens(&server, "admin", admin_password).await;
+
+    let delete_response = request_json(
+        &server,
+        Method::DELETE,
+        &format!("/api/v1/users/{user_id}"),
+        Some(&admin_token),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(delete_response.status_code(), StatusCode::NO_CONTENT);
+
+    let restore_response = request_json(
+        &server,
+        Method::POST,
+        &format!("/api/v1/users/{user_id}/restore"),
+        Some(&admin_token),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(restore_response.status_code(), StatusCode::OK);
+
+    let me_response = request_json(
+        &server,
+        Method::GET,
+        "/api/v1/users/me",
+        Some(&old_access_token),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(me_response.status_code(), StatusCode::UNAUTHORIZED);
+    let me_error = me_response.json::<Value>();
+    assert_eq!(me_error.get("code").and_then(Value::as_u64), Some(1001));
+
+    let refresh_response = request_json(
+        &server,
+        Method::POST,
+        "/api/v1/sessions/refresh",
+        None,
+        Some(&old_refresh_cookie),
+        None,
+    )
+    .await;
+    assert_eq!(refresh_response.status_code(), StatusCode::UNAUTHORIZED);
+    let refresh_error = refresh_response.json::<Value>();
+    assert_eq!(
+        refresh_error.get("code").and_then(Value::as_u64),
+        Some(1001)
+    );
+
+    cleanup_test_users(&pool, &[user_id]).await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
 async fn username_should_not_conflict_with_other_user_email_or_phone(pool: sqlx::PgPool) {
     let server = setup_user_management_test_app(pool.clone()).await;
 
