@@ -13,6 +13,7 @@ use crate::api::openapi::ApiDoc;
 use crate::config::runtime::RuntimeConfig;
 use crate::db::DbPool;
 use crate::error::AppError;
+use crate::modules::authorization::service::AuthorizationService;
 use crate::modules::security::handlers::patch_current_user_password_handler;
 use crate::modules::sessions::handlers::{
     create_session_handler, delete_current_session_handler, refresh_session_handler,
@@ -28,6 +29,7 @@ use crate::web_assets::{serve_frontend_index, serve_frontend_path};
 pub struct AppState {
     pub config: Arc<ArcSwap<RuntimeConfig>>,
     pub db: DbPool,
+    pub authorization_service: AuthorizationService,
 }
 
 impl AppState {
@@ -308,9 +310,13 @@ SET value = EXCLUDED.value,
         let state = AppState {
             config: Arc::new(ArcSwap::from_pointee(runtime)),
             db: pool.clone(),
+            authorization_service: AuthorizationService::new(pool.clone()),
         };
 
-        TestServer::new(app_router(state)).expect("创建测试服务器失败")
+        TestServer::new(app_router(state).layer(axum::middleware::from_fn(
+            crate::api::request_id::request_id_middleware,
+        )))
+        .expect("创建测试服务器失败")
     }
 
     async fn login_and_get_tokens(

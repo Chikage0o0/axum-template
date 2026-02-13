@@ -8,8 +8,11 @@ use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::api::request_id::current_request_id;
 use crate::error::AppError;
 use crate::http::router::AppState;
+use crate::modules::authorization::context::AuthorizationContext;
+use crate::modules::authorization::service::Decision;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
@@ -32,6 +35,32 @@ pub struct CurrentUser {
     pub user_id: Uuid,
     pub session_id: Uuid,
     pub role: String,
+}
+
+impl CurrentUser {
+    pub fn authorization_context(&self) -> AuthorizationContext {
+        AuthorizationContext::from_current_user(self)
+    }
+}
+
+pub async fn authorize(
+    state: &AppState,
+    current_user: &CurrentUser,
+    perm_code: &str,
+    resource_hint: Option<&str>,
+) -> Result<Decision, AppError> {
+    let request_id = current_request_id().unwrap_or_else(|| "req_unknown".to_string());
+    let ctx = current_user.authorization_context();
+    let decision = state
+        .authorization_service
+        .authorize(ctx.subjects(), perm_code, resource_hint, &request_id)
+        .await?;
+
+    if !decision.allowed {
+        return Err(AppError::PermissionDenied("权限不足".to_string()));
+    }
+
+    Ok(decision)
 }
 
 pub async fn auth_middleware(
@@ -108,11 +137,14 @@ LIMIT 1
         return Err(AppError::auth_token("Token 无效或已过期"));
     }
 
-    req.extensions_mut().insert(CurrentUser {
+    let current_user = CurrentUser {
         user_id,
         session_id,
         role: token_data.claims.role,
-    });
+    };
+    req.extensions_mut()
+        .insert(current_user.authorization_context());
+    req.extensions_mut().insert(current_user);
 
     Ok(next.run(req).await)
 }

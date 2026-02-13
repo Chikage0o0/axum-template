@@ -1,0 +1,69 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\nSELECT\n    policy_id,\n    subject_type,\n    subject_key,\n    perm_code,\n    effect,\n    scope_rule,\n    constraints,\n    priority\nFROM sys_policy\nWHERE (subject_type, subject_key) IN (\n    SELECT *\n    FROM UNNEST($1::text[], $2::text[])\n)\n  AND perm_code = ANY($3::text[])\n  AND (expire_at IS NULL OR expire_at > $4)\nORDER BY\n    priority DESC,\n    CASE WHEN effect = 'DENY' THEN 0 ELSE 1 END ASC,\n    CASE\n        WHEN perm_code = $5 THEN 0\n        WHEN perm_code = $6 THEN 1\n        ELSE 2\n    END ASC,\n    policy_id ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "policy_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "subject_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "subject_key",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "perm_code",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "effect",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "scope_rule",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "constraints",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 7,
+        "name": "priority",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "Timestamptz",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "1b3db0daca6eb30121e7b1f8b00ccd307d5e7bca2b644c7c1f45f1fbbfec57a4"
+}

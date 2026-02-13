@@ -64,6 +64,9 @@ async fn main() -> anyhow::Result<()> {
 
     let state = AppState {
         config: Arc::new(ArcSwap::from_pointee(runtime)),
+        authorization_service: crate::modules::authorization::service::AuthorizationService::new(
+            db.clone(),
+        ),
         db,
     };
 

@@ -120,3 +120,117 @@ async fn internal_error_should_not_expose_raw_database_message(_pool: sqlx::PgPo
     assert!(!message_lower.contains("duplicate"));
     assert!(!message_lower.contains("constraint"));
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn auth_failures_should_keep_request_id_contract(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let invalid_token_response = request_json(
+        &server,
+        Method::GET,
+        "/api/v1/users/me",
+        Some("invalid.token.value"),
+        None,
+        None,
+    )
+    .await;
+
+    assert_eq!(
+        invalid_token_response.status_code(),
+        StatusCode::UNAUTHORIZED
+    );
+    let invalid_token_header = invalid_token_response
+        .header("x-request-id")
+        .to_str()
+        .expect("401 响应 x-request-id 应为有效字符串")
+        .to_string();
+    let invalid_token_body = invalid_token_response.json::<Value>();
+    assert_eq!(
+        invalid_token_body.get("code").and_then(Value::as_u64),
+        Some(1001)
+    );
+    assert_eq!(
+        invalid_token_body
+            .get("request_id")
+            .and_then(Value::as_str)
+            .expect("401 错误体必须包含 request_id"),
+        invalid_token_header
+    );
+
+    let username = format!("req_id_user_{}", Uuid::new_v4().simple());
+    let password = "ReqIdPassword#A123";
+    let user_id = create_user_with_password(&pool, &username, password).await;
+
+    let (token, _) = login_and_get_tokens(&server, &username, password).await;
+    let forbidden_response = request_json(
+        &server,
+        Method::PATCH,
+        "/api/v1/settings",
+        Some(&token),
+        None,
+        Some(json!({
+            "app": {
+                "welcome_message": "forbidden"
+            }
+        })),
+    )
+    .await;
+
+    assert_eq!(forbidden_response.status_code(), StatusCode::FORBIDDEN);
+    let forbidden_header = forbidden_response
+        .header("x-request-id")
+        .to_str()
+        .expect("403 响应 x-request-id 应为有效字符串")
+        .to_string();
+    let forbidden_body = forbidden_response.json::<Value>();
+    assert_eq!(
+        forbidden_body.get("code").and_then(Value::as_u64),
+        Some(2002)
+    );
+    assert_eq!(
+        forbidden_body
+            .get("request_id")
+            .and_then(Value::as_str)
+            .expect("403 错误体必须包含 request_id"),
+        forbidden_header
+    );
+
+    cleanup_test_users(&pool, &[user_id]).await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn client_request_id_should_be_passthrough_in_error_response(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let username = format!("passthrough_user_{}", Uuid::new_v4().simple());
+    let password = "PassThroughPassword#A123";
+    let user_id = create_user_with_password(&pool, &username, password).await;
+    let (token, _) = login_and_get_tokens(&server, &username, password).await;
+
+    let request_id = format!("client-rid-{}", Uuid::new_v4().simple());
+    let response = server
+        .method(Method::PATCH, "/api/v1/settings")
+        .add_header("accept", "application/json")
+        .add_header("x-request-id", &request_id)
+        .authorization_bearer(&token)
+        .json(&json!({
+            "app": {
+                "welcome_message": "forbidden"
+            }
+        }))
+        .await;
+
+    assert_eq!(response.status_code(), StatusCode::FORBIDDEN);
+    assert_eq!(
+        response.header("x-request-id").to_str().ok(),
+        Some(request_id.as_str())
+    );
+    let body = response.json::<Value>();
+    assert_eq!(body.get("code").and_then(Value::as_u64), Some(2002));
+    assert_eq!(
+        body.get("request_id").and_then(Value::as_str),
+        Some(request_id.as_str())
+    );
+
+    cleanup_test_users(&pool, &[user_id]).await;
+}
