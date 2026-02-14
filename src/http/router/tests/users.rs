@@ -659,3 +659,340 @@ async fn user_can_patch_me_but_cannot_patch_others(pool: sqlx::PgPool) {
 
     cleanup_test_users(&pool, &[user_a_id, user_b_id]).await;
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn users_list_should_fail_closed_when_scope_rule_invalid(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let username = format!("invalid_scope_list_user_{}", Uuid::new_v4().simple());
+    let email = format!("{username}@example.invalid");
+    let password = "InvalidScopeListPwd#A123";
+    let user_id = create_or_update_user_with_password(&pool, &username, &email, password).await;
+
+    let _policy_id = insert_test_policy(
+        &pool,
+        "USER",
+        &user_id.to_string(),
+        "users:list",
+        "ALLOW",
+        "BROKEN_SCOPE",
+        60,
+    )
+    .await;
+
+    let (token, _) = login_and_get_tokens(&server, &username, password).await;
+    let response = request_json(
+        &server,
+        Method::GET,
+        "/api/v1/users",
+        Some(&token),
+        None,
+        None,
+    )
+    .await;
+
+    assert_eq!(response.status_code(), StatusCode::FORBIDDEN);
+    let request_id = response
+        .header("x-request-id")
+        .to_str()
+        .expect("403 响应应包含有效 x-request-id")
+        .to_string();
+    let body = response.json::<Value>();
+    assert_eq!(body.get("code").and_then(Value::as_u64), Some(2002));
+    assert_eq!(
+        body.get("request_id")
+            .and_then(Value::as_str)
+            .expect("403 错误体应包含 request_id"),
+        request_id
+    );
+
+    cleanup_test_users(&pool, &[user_id]).await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn users_update_scope_self_should_only_allow_current_user_target(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let actor_name = format!("scope_self_actor_{}", Uuid::new_v4().simple());
+    let actor_email = format!("{actor_name}@example.invalid");
+    let actor_password = "ScopeSelfActorPwd#A123";
+    let actor_id =
+        create_or_update_user_with_password(&pool, &actor_name, &actor_email, actor_password).await;
+
+    let target_name = format!("scope_self_target_{}", Uuid::new_v4().simple());
+    let target_email = format!("{target_name}@example.invalid");
+    let target_id =
+        create_or_update_user_with_password(&pool, &target_name, &target_email, "TargetPwd#A123")
+            .await;
+
+    let _policy_id = insert_test_policy(
+        &pool,
+        "USER",
+        &actor_id.to_string(),
+        "users:update",
+        "ALLOW",
+        "SELF",
+        60,
+    )
+    .await;
+
+    let (token, _) = login_and_get_tokens(&server, &actor_name, actor_password).await;
+
+    let patch_other = request_json(
+        &server,
+        Method::PATCH,
+        &format!("/api/v1/users/{target_id}"),
+        Some(&token),
+        None,
+        Some(json!({
+            "display_name": "should-deny",
+        })),
+    )
+    .await;
+    assert_eq!(patch_other.status_code(), StatusCode::FORBIDDEN);
+    let patch_other_body = patch_other.json::<Value>();
+    assert_eq!(
+        patch_other_body.get("code").and_then(Value::as_u64),
+        Some(2002)
+    );
+
+    let patch_self = request_json(
+        &server,
+        Method::PATCH,
+        &format!("/api/v1/users/{actor_id}"),
+        Some(&token),
+        None,
+        Some(json!({
+            "display_name": "scope-self-updated",
+        })),
+    )
+    .await;
+    assert_eq!(patch_self.status_code(), StatusCode::OK);
+
+    cleanup_test_users(&pool, &[actor_id, target_id]).await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn users_update_scope_id_should_only_allow_bound_target(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let actor_name = format!("scope_id_actor_{}", Uuid::new_v4().simple());
+    let actor_email = format!("{actor_name}@example.invalid");
+    let actor_password = "ScopeIdActorPwd#A123";
+    let actor_id =
+        create_or_update_user_with_password(&pool, &actor_name, &actor_email, actor_password).await;
+
+    let target_name = format!("scope_id_target_{}", Uuid::new_v4().simple());
+    let target_email = format!("{target_name}@example.invalid");
+    let target_id =
+        create_or_update_user_with_password(&pool, &target_name, &target_email, "TargetPwd#A123")
+            .await;
+
+    let other_name = format!("scope_id_other_{}", Uuid::new_v4().simple());
+    let other_email = format!("{other_name}@example.invalid");
+    let other_id =
+        create_or_update_user_with_password(&pool, &other_name, &other_email, "OtherPwd#A123")
+            .await;
+
+    let _policy_id = insert_test_policy(
+        &pool,
+        "USER",
+        &actor_id.to_string(),
+        "users:update",
+        "ALLOW",
+        &format!("ID:{target_id}"),
+        60,
+    )
+    .await;
+
+    let (token, _) = login_and_get_tokens(&server, &actor_name, actor_password).await;
+
+    let patch_other = request_json(
+        &server,
+        Method::PATCH,
+        &format!("/api/v1/users/{other_id}"),
+        Some(&token),
+        None,
+        Some(json!({
+            "display_name": "should-deny-by-id-scope",
+        })),
+    )
+    .await;
+    assert_eq!(patch_other.status_code(), StatusCode::FORBIDDEN);
+    let patch_other_body = patch_other.json::<Value>();
+    assert_eq!(
+        patch_other_body.get("code").and_then(Value::as_u64),
+        Some(2002)
+    );
+
+    let patch_target = request_json(
+        &server,
+        Method::PATCH,
+        &format!("/api/v1/users/{target_id}"),
+        Some(&token),
+        None,
+        Some(json!({
+            "display_name": "scope-id-updated",
+        })),
+    )
+    .await;
+    assert_eq!(patch_target.status_code(), StatusCode::OK);
+
+    cleanup_test_users(&pool, &[actor_id, target_id, other_id]).await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn users_delete_scope_id_should_only_allow_bound_target(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let actor_name = format!("scope_delete_actor_{}", Uuid::new_v4().simple());
+    let actor_email = format!("{actor_name}@example.invalid");
+    let actor_password = "ScopeDeleteActorPwd#A123";
+    let actor_id =
+        create_or_update_user_with_password(&pool, &actor_name, &actor_email, actor_password).await;
+
+    let target_name = format!("scope_delete_target_{}", Uuid::new_v4().simple());
+    let target_email = format!("{target_name}@example.invalid");
+    let target_id =
+        create_or_update_user_with_password(&pool, &target_name, &target_email, "TargetPwd#A123")
+            .await;
+
+    let other_name = format!("scope_delete_other_{}", Uuid::new_v4().simple());
+    let other_email = format!("{other_name}@example.invalid");
+    let other_id =
+        create_or_update_user_with_password(&pool, &other_name, &other_email, "OtherPwd#A123")
+            .await;
+
+    let _policy_id = insert_test_policy(
+        &pool,
+        "USER",
+        &actor_id.to_string(),
+        "users:delete",
+        "ALLOW",
+        &format!("ID:{target_id}"),
+        60,
+    )
+    .await;
+
+    let (token, _) = login_and_get_tokens(&server, &actor_name, actor_password).await;
+
+    let delete_other = request_json(
+        &server,
+        Method::DELETE,
+        &format!("/api/v1/users/{other_id}"),
+        Some(&token),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(delete_other.status_code(), StatusCode::FORBIDDEN);
+    let delete_other_body = delete_other.json::<Value>();
+    assert_eq!(
+        delete_other_body.get("code").and_then(Value::as_u64),
+        Some(2002)
+    );
+
+    let delete_target = request_json(
+        &server,
+        Method::DELETE,
+        &format!("/api/v1/users/{target_id}"),
+        Some(&token),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(delete_target.status_code(), StatusCode::NO_CONTENT);
+
+    cleanup_test_users(&pool, &[actor_id, target_id, other_id]).await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn users_restore_scope_id_should_only_allow_bound_target(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let admin_password = "AdminPassword#A123";
+    ensure_admin_user_with_password(&pool, admin_password).await;
+    let (admin_token, _) = login_and_get_tokens(&server, "admin", admin_password).await;
+
+    let actor_name = format!("scope_restore_actor_{}", Uuid::new_v4().simple());
+    let actor_email = format!("{actor_name}@example.invalid");
+    let actor_password = "ScopeRestoreActorPwd#A123";
+    let actor_id =
+        create_or_update_user_with_password(&pool, &actor_name, &actor_email, actor_password).await;
+
+    let target_name = format!("scope_restore_target_{}", Uuid::new_v4().simple());
+    let target_email = format!("{target_name}@example.invalid");
+    let target_id =
+        create_or_update_user_with_password(&pool, &target_name, &target_email, "TargetPwd#A123")
+            .await;
+
+    let other_name = format!("scope_restore_other_{}", Uuid::new_v4().simple());
+    let other_email = format!("{other_name}@example.invalid");
+    let other_id =
+        create_or_update_user_with_password(&pool, &other_name, &other_email, "OtherPwd#A123")
+            .await;
+
+    let _policy_id = insert_test_policy(
+        &pool,
+        "USER",
+        &actor_id.to_string(),
+        "users:restore",
+        "ALLOW",
+        &format!("ID:{target_id}"),
+        60,
+    )
+    .await;
+
+    let delete_target = request_json(
+        &server,
+        Method::DELETE,
+        &format!("/api/v1/users/{target_id}"),
+        Some(&admin_token),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(delete_target.status_code(), StatusCode::NO_CONTENT);
+
+    let delete_other = request_json(
+        &server,
+        Method::DELETE,
+        &format!("/api/v1/users/{other_id}"),
+        Some(&admin_token),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(delete_other.status_code(), StatusCode::NO_CONTENT);
+
+    let (token, _) = login_and_get_tokens(&server, &actor_name, actor_password).await;
+
+    let restore_other = request_json(
+        &server,
+        Method::POST,
+        &format!("/api/v1/users/{other_id}/restore"),
+        Some(&token),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(restore_other.status_code(), StatusCode::FORBIDDEN);
+    let restore_other_body = restore_other.json::<Value>();
+    assert_eq!(
+        restore_other_body.get("code").and_then(Value::as_u64),
+        Some(2002)
+    );
+
+    let restore_target = request_json(
+        &server,
+        Method::POST,
+        &format!("/api/v1/users/{target_id}/restore"),
+        Some(&token),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(restore_target.status_code(), StatusCode::OK);
+
+    cleanup_test_users(&pool, &[actor_id, target_id, other_id]).await;
+}

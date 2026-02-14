@@ -11,6 +11,9 @@ use crate::api::auth::{authorize, CurrentUser};
 use crate::db::DbPool;
 use crate::error::AppError;
 use crate::http::router::AppState;
+use crate::modules::authorization::scope::{
+    ensure_users_write_scope, parse_users_scope_rule, UsersScope,
+};
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct UserResponse {
@@ -255,8 +258,9 @@ pub async fn get_users_handler(
     Query(query): Query<ListUsersQuery>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<UserResponse>>, AppError> {
-    authorize(&state, &current_user, "users:list", None).await?;
-    let users = list_users(&state.db, query.include_deleted).await?;
+    let decision = authorize(&state, &current_user, "users:list", None).await?;
+    let scope = parse_users_scope_rule(decision.scope_rule.as_deref(), current_user.user_id)?;
+    let users = list_users(&state.db, query.include_deleted, scope).await?;
     Ok(Json(users))
 }
 
@@ -309,13 +313,15 @@ pub async fn patch_user_handler(
     >,
 ) -> Result<Json<UserResponse>, AppError> {
     let resource_hint = user_id.to_string();
-    authorize(
+    let decision = authorize(
         &state,
         &current_user,
         "users:update",
         Some(resource_hint.as_str()),
     )
     .await?;
+    let scope = parse_users_scope_rule(decision.scope_rule.as_deref(), current_user.user_id)?;
+    ensure_users_write_scope(scope, user_id)?;
 
     if current_user.user_id == user_id && payload.is_active == Some(false) {
         return Err(AppError::validation("管理员不能停用自己的账号"));
@@ -343,13 +349,15 @@ pub async fn delete_user_handler(
     State(state): State<AppState>,
 ) -> Result<StatusCode, AppError> {
     let resource_hint = user_id.to_string();
-    authorize(
+    let decision = authorize(
         &state,
         &current_user,
         "users:delete",
         Some(resource_hint.as_str()),
     )
     .await?;
+    let scope = parse_users_scope_rule(decision.scope_rule.as_deref(), current_user.user_id)?;
+    ensure_users_write_scope(scope, user_id)?;
 
     if current_user.user_id == user_id {
         return Err(AppError::validation("管理员不能删除自己的账号"));
@@ -377,13 +385,15 @@ pub async fn restore_user_handler(
     State(state): State<AppState>,
 ) -> Result<Json<UserResponse>, AppError> {
     let resource_hint = user_id.to_string();
-    authorize(
+    let decision = authorize(
         &state,
         &current_user,
         "users:restore",
         Some(resource_hint.as_str()),
     )
     .await?;
+    let scope = parse_users_scope_rule(decision.scope_rule.as_deref(), current_user.user_id)?;
+    ensure_users_write_scope(scope, user_id)?;
 
     let user = restore_user(&state.db, user_id).await?;
     Ok(Json(user))
@@ -403,10 +413,36 @@ struct UserRow {
     updated_at: DateTime<Utc>,
 }
 
-async fn list_users(db: &DbPool, include_deleted: bool) -> Result<Vec<UserResponse>, AppError> {
-    let users: Vec<UserRow> = sqlx::query_as!(
-        UserRow,
-        r#"
+async fn list_users(
+    db: &DbPool,
+    include_deleted: bool,
+    scope: UsersScope,
+) -> Result<Vec<UserResponse>, AppError> {
+    let users: Vec<UserRow> = match (scope.list_filter_user_id(), include_deleted) {
+        (None, true) => sqlx::query_as!(
+            UserRow,
+            r#"
+SELECT
+    id,
+    username,
+    display_name,
+    email,
+    phone,
+    avatar_url,
+    is_active,
+    metadata,
+    created_at,
+    updated_at
+FROM users
+ORDER BY created_at DESC
+            "#,
+        )
+        .fetch_all(db)
+        .await
+        .map_err(|e| AppError::InternalError(format!("查询用户列表失败: {e}")))?,
+        (None, false) => sqlx::query_as!(
+            UserRow,
+            r#"
 SELECT
     id,
     username,
@@ -421,12 +457,60 @@ SELECT
 FROM users
 WHERE ($1::bool = TRUE OR deleted_at IS NULL)
 ORDER BY created_at DESC
-        "#,
-        include_deleted,
-    )
-    .fetch_all(db)
-    .await
-    .map_err(|e| AppError::InternalError(format!("查询用户列表失败: {e}")))?;
+            "#,
+            include_deleted,
+        )
+        .fetch_all(db)
+        .await
+        .map_err(|e| AppError::InternalError(format!("查询用户列表失败: {e}")))?,
+        (Some(scope_user_id), true) => sqlx::query_as!(
+            UserRow,
+            r#"
+SELECT
+    id,
+    username,
+    display_name,
+    email,
+    phone,
+    avatar_url,
+    is_active,
+    metadata,
+    created_at,
+    updated_at
+FROM users
+WHERE id = $1
+ORDER BY created_at DESC
+            "#,
+            scope_user_id,
+        )
+        .fetch_all(db)
+        .await
+        .map_err(|e| AppError::InternalError(format!("查询用户列表失败: {e}")))?,
+        (Some(scope_user_id), false) => sqlx::query_as!(
+            UserRow,
+            r#"
+SELECT
+    id,
+    username,
+    display_name,
+    email,
+    phone,
+    avatar_url,
+    is_active,
+    metadata,
+    created_at,
+    updated_at
+FROM users
+WHERE id = $1
+  AND deleted_at IS NULL
+ORDER BY created_at DESC
+            "#,
+            scope_user_id,
+        )
+        .fetch_all(db)
+        .await
+        .map_err(|e| AppError::InternalError(format!("查询用户列表失败: {e}")))?,
+    };
 
     Ok(users
         .into_iter()
