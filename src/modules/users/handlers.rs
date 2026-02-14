@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::api::auth::CurrentUser;
+use crate::api::auth::{authorize, CurrentUser};
 use crate::db::DbPool;
 use crate::error::AppError;
 use crate::http::router::AppState;
@@ -173,15 +173,6 @@ pub struct ListUsersQuery {
     pub include_deleted: bool,
 }
 
-fn ensure_admin(current_user: &CurrentUser) -> Result<(), AppError> {
-    if current_user.role != "admin" {
-        return Err(AppError::PermissionDenied(
-            "仅管理员可执行该操作".to_string(),
-        ));
-    }
-    Ok(())
-}
-
 #[utoipa::path(
     get,
     path = "/api/v1/users/me",
@@ -198,6 +189,15 @@ pub async fn get_current_user_handler(
     Extension(current_user): Extension<CurrentUser>,
     State(state): State<AppState>,
 ) -> Result<Json<UserResponse>, AppError> {
+    let resource_hint = current_user.user_id.to_string();
+    authorize(
+        &state,
+        &current_user,
+        "users:me:view",
+        Some(resource_hint.as_str()),
+    )
+    .await?;
+
     let user = get_user_by_id(&state.db, current_user.user_id).await?;
     Ok(Json(user))
 }
@@ -223,6 +223,15 @@ pub async fn patch_current_user_handler(
         PatchCurrentUserRequest,
     >,
 ) -> Result<Json<UserResponse>, AppError> {
+    let resource_hint = current_user.user_id.to_string();
+    authorize(
+        &state,
+        &current_user,
+        "users:me:update",
+        Some(resource_hint.as_str()),
+    )
+    .await?;
+
     let user = patch_current_user(&state.db, current_user.user_id, payload).await?;
     Ok(Json(user))
 }
@@ -246,7 +255,7 @@ pub async fn get_users_handler(
     Query(query): Query<ListUsersQuery>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<UserResponse>>, AppError> {
-    ensure_admin(&current_user)?;
+    authorize(&state, &current_user, "users:list", None).await?;
     let users = list_users(&state.db, query.include_deleted).await?;
     Ok(Json(users))
 }
@@ -271,7 +280,7 @@ pub async fn create_user_handler(
         CreateUserRequest,
     >,
 ) -> Result<(StatusCode, Json<UserResponse>), AppError> {
-    ensure_admin(&current_user)?;
+    authorize(&state, &current_user, "users:create", None).await?;
     let user = create_user(&state.db, payload).await?;
     Ok((StatusCode::CREATED, Json(user)))
 }
@@ -299,7 +308,15 @@ pub async fn patch_user_handler(
         PatchUserRequest,
     >,
 ) -> Result<Json<UserResponse>, AppError> {
-    ensure_admin(&current_user)?;
+    let resource_hint = user_id.to_string();
+    authorize(
+        &state,
+        &current_user,
+        "users:update",
+        Some(resource_hint.as_str()),
+    )
+    .await?;
+
     if current_user.user_id == user_id && payload.is_active == Some(false) {
         return Err(AppError::validation("管理员不能停用自己的账号"));
     }
@@ -325,7 +342,15 @@ pub async fn delete_user_handler(
     Path(user_id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<StatusCode, AppError> {
-    ensure_admin(&current_user)?;
+    let resource_hint = user_id.to_string();
+    authorize(
+        &state,
+        &current_user,
+        "users:delete",
+        Some(resource_hint.as_str()),
+    )
+    .await?;
+
     if current_user.user_id == user_id {
         return Err(AppError::validation("管理员不能删除自己的账号"));
     }
@@ -351,7 +376,15 @@ pub async fn restore_user_handler(
     Path(user_id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<Json<UserResponse>, AppError> {
-    ensure_admin(&current_user)?;
+    let resource_hint = user_id.to_string();
+    authorize(
+        &state,
+        &current_user,
+        "users:restore",
+        Some(resource_hint.as_str()),
+    )
+    .await?;
+
     let user = restore_user(&state.db, user_id).await?;
     Ok(Json(user))
 }

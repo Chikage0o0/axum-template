@@ -283,6 +283,41 @@ RETURNING id
         .expect("清理测试用户失败");
     }
 
+    async fn insert_test_policy(
+        pool: &crate::db::DbPool,
+        subject_type: &str,
+        subject_key: &str,
+        perm_code: &str,
+        effect: &str,
+        scope_rule: &str,
+        priority: i32,
+    ) -> i64 {
+        sqlx::query_scalar!(
+            r#"
+INSERT INTO sys_policy (
+    subject_type,
+    subject_key,
+    perm_code,
+    effect,
+    scope_rule,
+    constraints,
+    priority
+)
+VALUES ($1, $2, $3, $4, $5, '{}'::jsonb, $6)
+RETURNING policy_id
+            "#,
+            subject_type,
+            subject_key,
+            perm_code,
+            effect,
+            scope_rule,
+            priority,
+        )
+        .fetch_one(pool)
+        .await
+        .expect("插入测试策略失败")
+    }
+
     async fn setup_user_management_test_app(pool: crate::db::DbPool) -> TestServer {
         sqlx::migrate!("./migrations")
             .run(&pool)

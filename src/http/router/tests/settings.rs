@@ -95,3 +95,52 @@ async fn non_admin_should_be_forbidden_to_patch_settings(pool: sqlx::PgPool) {
 
     cleanup_test_users(&pool, &[user_id]).await;
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn non_admin_with_settings_update_policy_should_patch_settings(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let username = format!("settings_policy_user_{}", Uuid::new_v4().simple());
+    let email = format!("{username}@example.invalid");
+    let password = "SettingsPolicyPassword#A123";
+    let user_id = create_or_update_user_with_password(&pool, &username, &email, password).await;
+
+    let _policy_id = insert_test_policy(
+        &pool,
+        "USER",
+        &user_id.to_string(),
+        "settings:update",
+        "ALLOW",
+        "ALL",
+        50,
+    )
+    .await;
+
+    let (token, _) = login_and_get_tokens(&server, &username, password).await;
+    let message = format!("policy-updated-{}", Uuid::new_v4().simple());
+    let response = request_json(
+        &server,
+        Method::PATCH,
+        "/api/v1/settings",
+        Some(&token),
+        None,
+        Some(serde_json::json!({
+            "app": {
+                "welcome_message": message,
+            }
+        })),
+    )
+    .await;
+
+    assert_eq!(response.status_code(), StatusCode::OK);
+    let body = response.json::<Value>();
+    assert!(
+        body.get("app")
+            .and_then(|app| app.get("welcome_message"))
+            .and_then(Value::as_str)
+            .is_some(),
+        "返回体应包含 app.welcome_message"
+    );
+
+    cleanup_test_users(&pool, &[user_id]).await;
+}

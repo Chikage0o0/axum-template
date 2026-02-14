@@ -4,19 +4,10 @@ use garde::Validate;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::api::auth::CurrentUser;
+use crate::api::auth::{authorize, CurrentUser};
 use crate::error::AppError;
 use crate::http::router::AppState;
 use crate::services::system_config;
-
-fn ensure_admin(current_user: &CurrentUser) -> Result<(), AppError> {
-    if current_user.role != "admin" {
-        return Err(AppError::PermissionDenied(
-            "仅管理员可执行该操作".to_string(),
-        ));
-    }
-    Ok(())
-}
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct SettingsResponse {
@@ -48,8 +39,11 @@ pub struct IntegrationsSettings {
     security(("bearer_auth" = []))
 )]
 pub async fn get_settings_handler(
+    Extension(current_user): Extension<CurrentUser>,
     State(state): State<AppState>,
 ) -> Result<Json<SettingsResponse>, AppError> {
+    authorize(&state, &current_user, "settings:view", None).await?;
+
     let cfg = state.config.load_full();
 
     Ok(Json(SettingsResponse {
@@ -131,7 +125,7 @@ pub async fn patch_settings_handler(
         PatchSettingsRequest,
     >,
 ) -> Result<Json<SettingsResponse>, AppError> {
-    ensure_admin(&current_user)?;
+    authorize(&state, &current_user, "settings:update", None).await?;
     let mut changes: Vec<(String, serde_json::Value)> = Vec::new();
 
     if let Some(app) = payload.app {
@@ -166,5 +160,5 @@ pub async fn patch_settings_handler(
 
     system_config::upsert_many(&state.db, changes).await?;
     state.reload_runtime().await?;
-    get_settings_handler(State(state)).await
+    get_settings_handler(Extension(current_user), State(state)).await
 }

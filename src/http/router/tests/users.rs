@@ -166,11 +166,105 @@ async fn non_admin_should_forbidden_on_user_management_routes(pool: sqlx::PgPool
             StatusCode::FORBIDDEN,
             "非管理员访问 {uri} 应返回 403"
         );
+        let request_id = response
+            .header("x-request-id")
+            .to_str()
+            .expect("403 响应应包含有效 x-request-id")
+            .to_string();
         let body = response.json::<Value>();
         assert_eq!(body.get("code").and_then(Value::as_u64), Some(2002));
+        assert_eq!(
+            body.get("request_id")
+                .and_then(Value::as_str)
+                .expect("403 错误体应包含 request_id"),
+            request_id
+        );
     }
 
     cleanup_test_users(&pool, &[normal_user_id, target_user_id]).await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn non_admin_with_users_list_policy_should_access_user_list(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let username = format!("users_list_user_{}", Uuid::new_v4().simple());
+    let email = format!("{username}@example.invalid");
+    let password = "UsersListPassword#A123";
+    let user_id = create_or_update_user_with_password(&pool, &username, &email, password).await;
+
+    let _policy_id = insert_test_policy(
+        &pool,
+        "USER",
+        &user_id.to_string(),
+        "users:list",
+        "ALLOW",
+        "ALL",
+        50,
+    )
+    .await;
+
+    let (token, _) = login_and_get_tokens(&server, &username, password).await;
+    let response = request_json(
+        &server,
+        Method::GET,
+        "/api/v1/users",
+        Some(&token),
+        None,
+        None,
+    )
+    .await;
+
+    assert_eq!(response.status_code(), StatusCode::OK);
+    let body = response.json::<Value>();
+    assert!(body.is_array(), "users:list 应返回数组");
+
+    cleanup_test_users(&pool, &[user_id]).await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn explicit_user_deny_users_wildcard_should_override_admin_role(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let admin_password = "AdminPassword#A123";
+    let admin_id = ensure_admin_user_with_password(&pool, admin_password).await;
+
+    let _policy_id = insert_test_policy(
+        &pool,
+        "USER",
+        &admin_id.to_string(),
+        "users:*",
+        "DENY",
+        "ALL",
+        100,
+    )
+    .await;
+
+    let (admin_token, _) = login_and_get_tokens(&server, "admin", admin_password).await;
+    let response = request_json(
+        &server,
+        Method::GET,
+        "/api/v1/users",
+        Some(&admin_token),
+        None,
+        None,
+    )
+    .await;
+
+    assert_eq!(response.status_code(), StatusCode::FORBIDDEN);
+    let request_id = response
+        .header("x-request-id")
+        .to_str()
+        .expect("403 响应应包含有效 x-request-id")
+        .to_string();
+    let body = response.json::<Value>();
+    assert_eq!(body.get("code").and_then(Value::as_u64), Some(2002));
+    assert_eq!(
+        body.get("request_id")
+            .and_then(Value::as_str)
+            .expect("403 错误体应包含 request_id"),
+        request_id
+    );
 }
 
 #[sqlx::test(migrations = "./migrations")]
