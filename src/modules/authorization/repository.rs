@@ -77,6 +77,69 @@ ORDER BY
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e: anyhow::Error| AppError::InternalError(format!("解析授权策略失败: {e}")))
     }
+
+    pub async fn fetch_active_policies_for_subjects(
+        &self,
+        subjects: &[Subject],
+        now: DateTime<Utc>,
+    ) -> Result<Vec<Policy>, AppError> {
+        if subjects.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let subject_types: Vec<&str> = subjects.iter().map(|s| s.subject_type.as_str()).collect();
+        let subject_keys: Vec<&str> = subjects.iter().map(|s| s.subject_key.as_str()).collect();
+
+        let rows = sqlx::query_as_unchecked!(
+            PolicyRow,
+            r#"
+SELECT
+    policy_id,
+    subject_type,
+    subject_key,
+    perm_code,
+    effect,
+    scope_rule,
+    constraints,
+    priority
+FROM sys_policy
+WHERE (subject_type, subject_key) IN (
+    SELECT *
+    FROM UNNEST($1::text[], $2::text[])
+)
+  AND (expire_at IS NULL OR expire_at > $3)
+ORDER BY
+    priority DESC,
+    CASE WHEN effect = 'DENY' THEN 0 ELSE 1 END ASC,
+    perm_code ASC,
+    policy_id ASC
+            "#,
+            &subject_types,
+            &subject_keys,
+            now,
+        )
+        .fetch_all(&self.db)
+        .await
+        .map_err(|e| AppError::InternalError(format!("查询授权策略失败: {e}")))?;
+
+        rows.into_iter()
+            .map(TryFrom::try_from)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e: anyhow::Error| AppError::InternalError(format!("解析授权策略失败: {e}")))
+    }
+
+    pub async fn list_permission_codes(&self) -> Result<Vec<String>, AppError> {
+        sqlx::query_scalar!(
+            r#"
+SELECT perm_code
+FROM sys_permission
+ORDER BY perm_code ASC
+            "#,
+        )
+        .fetch_all(&self.db)
+        .await
+        .map_err(|e| AppError::InternalError(format!("读取权限码失败: {e}")))
+    }
 }
 
 pub fn permission_candidates(perm_code: &str) -> Vec<String> {

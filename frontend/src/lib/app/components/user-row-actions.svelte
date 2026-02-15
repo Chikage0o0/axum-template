@@ -11,12 +11,16 @@
     row,
     currentUserId = null,
     deletingUserId = null,
+    canEdit = true,
+    canDelete = true,
     onEdit,
     onDelete,
   }: {
     row: UserResponse;
     currentUserId?: string | null;
     deletingUserId?: string | null;
+    canEdit?: boolean;
+    canDelete?: boolean;
     onEdit: (row: UserResponse) => void;
     onDelete: (row: UserResponse) => void;
   } = $props();
@@ -34,12 +38,17 @@
     {/snippet}
   </DropdownMenu.Trigger>
   <DropdownMenu.Content align="end">
-    <DropdownMenu.Item disabled={deleting} onclick={() => onEdit(row)}>
+    <DropdownMenu.Item disabled={deleting || !canEdit} onclick={() => onEdit(row)}>
       <PencilIcon class="size-4" />
       编辑
     </DropdownMenu.Item>
     <DropdownMenu.Separator />
-    {#if isSelf}
+    {#if !canDelete}
+      <DropdownMenu.Item disabled>
+        <Trash2Icon class="size-4" />
+        删除
+      </DropdownMenu.Item>
+    {:else if isSelf}
       <Tooltip.Provider ignoreNonKeyboardFocus={true}>
         <Tooltip.Root>
           <Tooltip.Trigger>

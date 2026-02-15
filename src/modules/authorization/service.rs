@@ -60,4 +60,38 @@ impl AuthorizationService {
 
         Ok(decision)
     }
+
+    pub async fn list_allowed_permissions(
+        &self,
+        subjects: &[Subject],
+        request_id: &str,
+    ) -> Result<Vec<String>, AppError> {
+        let now = Utc::now();
+        let all_permissions = self.repository.list_permission_codes().await?;
+        if all_permissions.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let policies = self
+            .repository
+            .fetch_active_policies_for_subjects(subjects, now)
+            .await?;
+
+        let mut allowed = Vec::new();
+        for perm_code in all_permissions {
+            let result = evaluate(&policies, subjects, &perm_code, now);
+            if result.allowed {
+                allowed.push(perm_code);
+            }
+        }
+
+        tracing::info!(
+            request_id = %request_id,
+            subjects_count = subjects.len(),
+            permissions_count = allowed.len(),
+            "authorization permissions snapshot"
+        );
+
+        Ok(allowed)
+    }
 }

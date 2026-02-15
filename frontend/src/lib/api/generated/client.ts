@@ -205,6 +205,8 @@ export interface UserResponse {
   is_active: boolean;
   metadata: unknown;
   /** @nullable */
+  permissions?: string[] | null;
+  /** @nullable */
   phone?: string | null;
   updated_at: string;
   /** @nullable */

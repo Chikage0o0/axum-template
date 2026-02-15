@@ -1165,6 +1165,15 @@
             "type": "boolean"
           },
           "metadata": {},
+          "permissions": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
           "phone": {
             "type": [
               "string",

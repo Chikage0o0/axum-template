@@ -162,4 +162,24 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn should_expose_permissions_in_user_response_schema() {
+        let doc = ApiDoc::openapi();
+        let schemas = doc.components.expect("openapi components 应存在").schemas;
+        let user_response = schemas
+            .get("UserResponse")
+            .expect("UserResponse schema 应存在")
+            .clone();
+
+        let obj = match user_response {
+            utoipa::openapi::RefOr::T(utoipa::openapi::schema::Schema::Object(obj)) => obj,
+            _ => panic!("UserResponse schema 类型应为 object"),
+        };
+
+        assert!(
+            obj.properties.contains_key("permissions"),
+            "UserResponse 应包含 permissions 字段"
+        );
+    }
 }

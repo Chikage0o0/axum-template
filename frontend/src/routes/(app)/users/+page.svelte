@@ -18,6 +18,7 @@
   import { type FieldErrors, zodErrorToFieldErrors } from "$lib/shared/forms/field-errors";
   import { useFieldErrors } from "$lib/shared/forms/use-field-errors.svelte";
   import { auth } from "$lib/features/auth/state/auth";
+  import { createPermissionSet } from "$lib/features/auth/model/permission-set";
   import { buildUserPatchPayload } from "$lib/features/auth/model/user-helpers";
   import { buildUserDetailRows, toUserStatusLabel } from "$lib/features/users/model/user-detail";
   import * as AlertDialog from "$lib/shadcn/components/ui/alert-dialog/index.js";
@@ -84,6 +85,10 @@
   const sheetSubmitLabel = $derived(sheetMode === "create" ? "创建用户" : "保存修改");
   const activeUserCount = $derived(users.filter((user) => user.is_active).length);
   const detailRows = $derived(detailUser ? buildUserDetailRows(detailUser) : []);
+  const permissionSet = $derived.by(() => createPermissionSet($auth.permissions));
+  const canCreateUsers = $derived(permissionSet.can("users:create"));
+  const canUpdateUsers = $derived(permissionSet.can("users:update"));
+  const canDeleteUsers = $derived(permissionSet.can("users:delete"));
 
   function isSelfRow(userId: string): boolean {
     return $auth.user?.sub === userId;
@@ -98,6 +103,10 @@
   }
 
   function openCreateSheet() {
+    if (!canCreateUsers) {
+      toast.warning("缺少 users:create 权限");
+      return;
+    }
     sheetMode = "create";
     selectedUser = null;
     draft = emptyDraft();
@@ -106,6 +115,10 @@
   }
 
   function openEditSheet(user: UserResponse) {
+    if (!canUpdateUsers) {
+      toast.warning("缺少 users:update 权限");
+      return;
+    }
     sheetMode = "edit";
     selectedUser = user;
     draft = {
@@ -261,6 +274,10 @@
 
   /** 打开删除确认对话框 */
   function requestDelete(user: UserResponse) {
+    if (!canDeleteUsers) {
+      toast.warning("缺少 users:delete 权限");
+      return;
+    }
     if (isSelfRow(user.id)) {
       toast.warning("当前登录账号不允许自删除");
       return;
@@ -303,7 +320,12 @@
   <!-- 页面标题栏 -->
   <PageHeader title="用户管理">
     {#snippet actions()}
-      <UsersToolbar loading={listLoading} onRefresh={reloadUsers} onCreate={openCreateSheet} />
+      <UsersToolbar
+        loading={listLoading}
+        canCreate={canCreateUsers}
+        onRefresh={reloadUsers}
+        onCreate={openCreateSheet}
+      />
     {/snippet}
   </PageHeader>
 
@@ -311,7 +333,8 @@
     <Empty.Root>
       <Empty.Header>
         <Empty.Title>无权限访问用户管理</Empty.Title>
-        <Empty.Description>仅管理员可访问此页面，请联系管理员分配权限。</Empty.Description>
+        <Empty.Description>当前账号缺少 `users:list` 权限，请联系管理员分配策略。</Empty.Description
+        >
       </Empty.Header>
     </Empty.Root>
   {:else}
@@ -415,6 +438,8 @@
                     <UserRowActions
                       row={user}
                       currentUserId={$auth.user?.sub}
+                      canEdit={canUpdateUsers}
+                      canDelete={canDeleteUsers}
                       {deletingUserId}
                       onEdit={openEditSheet}
                       onDelete={requestDelete}
@@ -508,6 +533,8 @@
                       <UserRowActions
                         row={user}
                         currentUserId={$auth.user?.sub}
+                        canEdit={canUpdateUsers}
+                        canDelete={canDeleteUsers}
                         {deletingUserId}
                         onEdit={openEditSheet}
                         onDelete={requestDelete}

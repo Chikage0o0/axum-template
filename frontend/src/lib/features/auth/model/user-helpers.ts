@@ -122,14 +122,30 @@ export function buildCurrentUserPatchPayload(
 }
 
 export function toAuthUser(
-  user: Pick<User, "id" | "display_name" | "email" | "avatar_url">,
+  user: Pick<User, "id" | "display_name" | "email" | "avatar_url"> & {
+    permissions?: unknown;
+  },
 ): AuthUser | null {
   const sub = user.id.trim();
   const displayName = user.display_name.trim();
   const email = user.email.trim();
   const avatarUrl = user.avatar_url?.trim() ?? "";
   if (!sub || !displayName || !email) return null;
-  return { sub, displayName, email, avatarUrl };
+  return {
+    sub,
+    displayName,
+    email,
+    avatarUrl,
+    permissions: normalizePermissions(user.permissions),
+  };
+}
+
+function normalizePermissions(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
 }
 
 function isEmail(input: string): boolean {

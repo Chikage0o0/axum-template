@@ -1,7 +1,6 @@
 import { writable } from "svelte/store";
 import type { AuthUser } from "$lib/features/auth/model/auth-user";
-import type { AuthRole } from "$lib/features/auth/model/token-role";
-import { readRoleFromToken } from "$lib/features/auth/model/token-role";
+import { createPermissionSet } from "$lib/features/auth/model/permission-set";
 
 export type Flash = { title: string; message: string };
 
@@ -9,7 +8,7 @@ export type AuthState = {
   isAuthenticated: boolean;
   token: string | null;
   user: AuthUser | null;
-  role: AuthRole;
+  permissions: string[];
   flash: Flash | null;
 };
 
@@ -17,7 +16,7 @@ const initialState: AuthState = {
   isAuthenticated: false,
   token: null,
   user: null,
-  role: "user",
+  permissions: [],
   flash: null,
 };
 
@@ -38,7 +37,7 @@ export const auth = {
       isAuthenticated: true,
       token,
       user: null,
-      role: readRoleFromToken(token),
+      permissions: [],
       flash: null,
     });
   },
@@ -48,7 +47,7 @@ export const auth = {
         ? { title: "登录失效", message: "令牌已过期或无效，请重新登录" }
         : null;
 
-    store.set({ isAuthenticated: false, token: null, user: null, role: "user", flash });
+    store.set({ isAuthenticated: false, token: null, user: null, permissions: [], flash });
   },
   clearFlash() {
     store.update((s) => ({ ...s, flash: null }));
@@ -56,7 +55,13 @@ export const auth = {
   syncUser(user: AuthUser | null) {
     store.update((s) => {
       if (!s.isAuthenticated || !s.token) return s;
-      return { ...s, user };
+      if (!user) {
+        return { ...s, user: null, permissions: [] };
+      }
+      return { ...s, user, permissions: user.permissions };
     });
+  },
+  can(permCode: string) {
+    return createPermissionSet(currentState.permissions).can(permCode);
   },
 };

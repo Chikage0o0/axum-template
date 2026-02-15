@@ -51,7 +51,7 @@
   <AppSidebar
     currentPath={pathname}
     currentUser={$auth.user}
-    currentRole={$auth.role}
+    currentPermissions={$auth.permissions}
     onLogout={handleLogout}
   />
   <Sidebar.Inset class="aurora-surface">

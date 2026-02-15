@@ -9,23 +9,24 @@
   import NavUser from "./nav-user.svelte";
   import * as Sidebar from "$lib/shadcn/components/ui/sidebar/index.js";
   import type { AuthUser } from "$lib/features/auth/model/auth-user";
-  import type { AuthRole } from "$lib/features/auth/model/token-role";
+  import { createPermissionSet } from "$lib/features/auth/model/permission-set";
 
   let {
     ref = $bindable(null),
     currentPath,
     currentUser,
-    currentRole,
+    currentPermissions,
     onLogout,
     ...restProps
   }: ComponentProps<typeof Sidebar.Root> & {
     currentPath: string;
     currentUser: AuthUser | null;
-    currentRole: AuthRole;
+    currentPermissions: string[];
     onLogout: () => void;
   } = $props();
 
   const navMain = $derived.by(() => {
+    const permissionSet = createPermissionSet(currentPermissions);
     const base = [
       {
         title: "仪表盘",
@@ -39,7 +40,7 @@
       },
     ];
 
-    if (currentRole === "admin") {
+    if (permissionSet.can("users:list")) {
       base.push({
         title: "用户管理",
         url: "/users",

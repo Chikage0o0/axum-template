@@ -602,6 +602,234 @@ async fn username_should_reject_special_symbols_and_require_letters(pool: sqlx::
 }
 
 #[sqlx::test(migrations = "./migrations")]
+async fn get_current_user_should_include_permissions(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let username = format!("me_permissions_user_{}", Uuid::new_v4().simple());
+    let email = format!("{username}@example.invalid");
+    let password = "MePermissionsPwd#A123";
+    let user_id = create_or_update_user_with_password(&pool, &username, &email, password).await;
+
+    let (token, _) = login_and_get_tokens(&server, &username, password).await;
+    let response = request_json(
+        &server,
+        Method::GET,
+        "/api/v1/users/me",
+        Some(&token),
+        None,
+        None,
+    )
+    .await;
+
+    assert_eq!(response.status_code(), StatusCode::OK);
+    let body = response.json::<Value>();
+    let permissions = body
+        .get("permissions")
+        .and_then(Value::as_array)
+        .expect("/users/me 应包含 permissions 数组");
+
+    let contains_perm = |perm: &str| {
+        permissions
+            .iter()
+            .any(|item| item.as_str().is_some_and(|value| value == perm))
+    };
+
+    assert!(contains_perm("users:me:view"));
+    assert!(contains_perm("users:me:update"));
+    assert!(!contains_perm("users:list"));
+
+    cleanup_test_users(&pool, &[user_id]).await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn policy_permissions_and_scope_should_work_end_to_end(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let actor_name = format!("auth_e2e_actor_{}", Uuid::new_v4().simple());
+    let actor_email = format!("{actor_name}@example.invalid");
+    let actor_password = "AuthE2EActorPwd#A123";
+    let actor_id =
+        create_or_update_user_with_password(&pool, &actor_name, &actor_email, actor_password).await;
+
+    let peer_name = format!("auth_e2e_peer_{}", Uuid::new_v4().simple());
+    let peer_email = format!("{peer_name}@example.invalid");
+    let peer_id =
+        create_or_update_user_with_password(&pool, &peer_name, &peer_email, "PeerPwd#A123").await;
+
+    let (token, _) = login_and_get_tokens(&server, &actor_name, actor_password).await;
+
+    let me_before = request_json(
+        &server,
+        Method::GET,
+        "/api/v1/users/me",
+        Some(&token),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(me_before.status_code(), StatusCode::OK);
+    let me_before_body = me_before.json::<Value>();
+    let me_before_permissions = me_before_body
+        .get("permissions")
+        .and_then(Value::as_array)
+        .expect("/users/me 应返回 permissions 数组");
+    assert!(me_before_permissions
+        .iter()
+        .any(|v| v.as_str() == Some("users:me:view")));
+    assert!(me_before_permissions
+        .iter()
+        .any(|v| v.as_str() == Some("users:me:update")));
+    assert!(!me_before_permissions
+        .iter()
+        .any(|v| v.as_str() == Some("users:list")));
+
+    let _list_policy = insert_test_policy(
+        &pool,
+        "USER",
+        &actor_id.to_string(),
+        "users:list",
+        "ALLOW",
+        "SELF",
+        60,
+    )
+    .await;
+    let _update_policy = insert_test_policy(
+        &pool,
+        "USER",
+        &actor_id.to_string(),
+        "users:update",
+        "ALLOW",
+        "SELF",
+        60,
+    )
+    .await;
+
+    let me_after_allow = request_json(
+        &server,
+        Method::GET,
+        "/api/v1/users/me",
+        Some(&token),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(me_after_allow.status_code(), StatusCode::OK);
+    let me_after_allow_body = me_after_allow.json::<Value>();
+    let me_after_allow_permissions = me_after_allow_body
+        .get("permissions")
+        .and_then(Value::as_array)
+        .expect("/users/me 应返回 permissions 数组");
+    assert!(me_after_allow_permissions
+        .iter()
+        .any(|v| v.as_str() == Some("users:list")));
+    assert!(me_after_allow_permissions
+        .iter()
+        .any(|v| v.as_str() == Some("users:update")));
+
+    let list_response = request_json(
+        &server,
+        Method::GET,
+        "/api/v1/users",
+        Some(&token),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(list_response.status_code(), StatusCode::OK);
+    let listed_users = list_response
+        .json::<Value>()
+        .as_array()
+        .expect("用户列表响应体应为 JSON 数组")
+        .clone();
+    assert_eq!(listed_users.len(), 1, "SELF scope 仅应返回当前用户");
+    assert_eq!(
+        listed_users[0].get("id").and_then(Value::as_str),
+        Some(actor_id.to_string().as_str())
+    );
+
+    let patch_peer = request_json(
+        &server,
+        Method::PATCH,
+        &format!("/api/v1/users/{peer_id}"),
+        Some(&token),
+        None,
+        Some(json!({
+            "display_name": "should-deny-by-self-scope"
+        })),
+    )
+    .await;
+    assert_eq!(patch_peer.status_code(), StatusCode::FORBIDDEN);
+    let patch_peer_request_id = patch_peer
+        .header("x-request-id")
+        .to_str()
+        .expect("403 响应应包含有效 x-request-id")
+        .to_string();
+    let patch_peer_body = patch_peer.json::<Value>();
+    assert_eq!(
+        patch_peer_body.get("code").and_then(Value::as_u64),
+        Some(2002)
+    );
+    assert_eq!(
+        patch_peer_body
+            .get("request_id")
+            .and_then(Value::as_str)
+            .expect("403 错误体应包含 request_id"),
+        patch_peer_request_id
+    );
+
+    let patch_self = request_json(
+        &server,
+        Method::PATCH,
+        &format!("/api/v1/users/{actor_id}"),
+        Some(&token),
+        None,
+        Some(json!({
+            "display_name": "auth-e2e-self-updated"
+        })),
+    )
+    .await;
+    assert_eq!(patch_self.status_code(), StatusCode::OK);
+
+    let _deny_list_policy = insert_test_policy(
+        &pool,
+        "USER",
+        &actor_id.to_string(),
+        "users:list",
+        "DENY",
+        "ALL",
+        100,
+    )
+    .await;
+
+    let denied_list_response = request_json(
+        &server,
+        Method::GET,
+        "/api/v1/users",
+        Some(&token),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(denied_list_response.status_code(), StatusCode::FORBIDDEN);
+    let denied_request_id = denied_list_response
+        .header("x-request-id")
+        .to_str()
+        .expect("403 响应应包含有效 x-request-id")
+        .to_string();
+    let denied_body = denied_list_response.json::<Value>();
+    assert_eq!(denied_body.get("code").and_then(Value::as_u64), Some(2002));
+    assert_eq!(
+        denied_body
+            .get("request_id")
+            .and_then(Value::as_str)
+            .expect("403 错误体应包含 request_id"),
+        denied_request_id
+    );
+
+    cleanup_test_users(&pool, &[actor_id, peer_id]).await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
 async fn user_can_patch_me_but_cannot_patch_others(pool: sqlx::PgPool) {
     let server = setup_user_management_test_app(pool.clone()).await;
 

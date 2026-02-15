@@ -1,6 +1,6 @@
 # 数据库（模板）
 
-本模板包含以下核心表：`system_config`、`users`、`auth_sessions`。
+本模板包含以下核心表：`system_config`、`users`、`auth_sessions`、`sys_permission`、`sys_policy`。
 
 ## SQL 开发约束
 
@@ -58,3 +58,42 @@
 - 存储 refresh token 对应的服务端会话状态
 - 支持 refresh token 轮换（rotation）与会话撤销
 - 支持“仅当前用户全部设备下线”，不影响其他用户
+
+## 表：sys_permission
+
+字段（核心）：
+
+- `perm_code` (text, PK)
+- `perm_name` (text)
+- `description` (text, nullable)
+- `created_at` / `updated_at` (timestamptz)
+
+用途：
+
+- 维护权限码元数据（OpenAPI/前端能力化与后端策略评估的共同字典）
+
+## 表：sys_policy
+
+字段（核心）：
+
+- `policy_id` (bigserial, PK)
+- `subject_type` (text, `USER|ROLE`)
+- `subject_key` (text)
+- `perm_code` (text, FK -> `sys_permission.perm_code`)
+- `effect` (text, `ALLOW|DENY`)
+- `scope_rule` (text, default `ALL`)
+- `constraints` (jsonb, default `{}`)
+- `expire_at` (timestamptz, nullable)
+- `priority` (int, default `0`)
+- `created_at` / `updated_at` (timestamptz)
+
+约束与索引：
+
+- `subject_type` / `effect` 均有枚举值约束
+- `constraints` 要求为 JSON object，且 `expire_at`、`ip_range`（若存在）必须是字符串
+- 关键索引：`(subject_type, subject_key)`、`(perm_code)`、`(expire_at)`
+
+用途：
+
+- 承载统一策略授权（按主体、权限、效果、范围、约束进行判定）
+- 支持同一请求合并评估 `USER` 与 `ROLE` 策略

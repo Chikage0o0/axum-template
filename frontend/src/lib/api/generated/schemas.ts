@@ -62,6 +62,7 @@ export const UserResponse = z
     id: z.string().uuid(),
     is_active: z.boolean(),
     metadata: z.unknown(),
+    permissions: z.union([z.array(z.string()), z.null()]).optional(),
     phone: z.union([z.string(), z.null()]).optional(),
     updated_at: z.string().datetime({ offset: true }),
     username: z.union([z.string(), z.null()]).optional(),

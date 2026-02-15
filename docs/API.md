@@ -30,6 +30,36 @@
 - `2002`：权限不足
 - `5000`：内部错误
 
+## 授权与权限模型
+
+授权采用统一策略模型：`Subject + Permission + Effect + Scope + Constraint`。
+
+- 主体（Subject）：`USER:<uuid>` 与 `ROLE:<role>` 同时参与评估
+- 效果（Effect）：`ALLOW` / `DENY`（同优先级下 `DENY` 优先）
+- 权限命名：`<resource>:<action>`（如 `users:list`、`settings:update`）
+- 通配规则：支持 `users:*` 与 `*`
+
+### Scope 规则（一期）
+
+- `ALL`：不附加资源过滤
+- `SELF`：仅当前用户资源（用户域固定为 `users.id = current_user.id`）
+- `ID:<uuid>`：仅指定资源 ID
+
+`scope_rule` 非法或无法解析时，接口固定 fail-closed：返回 `403`（错误码 `2002`），错误体包含 `request_id`，且与响应头 `x-request-id` 一致。
+
+### Constraint 规则（一期）
+
+- 已生效：`constraints.expire_at`（RFC3339，过期后策略失效）
+- 预留：`constraints.ip_range`
+
+### 权限码（当前内置）
+
+- `*`
+- `users:*`、`users:me:view`、`users:me:update`、`users:list`、`users:create`、`users:update`、`users:delete`、`users:restore`
+- `settings:view`、`settings:update`
+- `security:password:update`
+- `sessions:current:delete`
+
 ## 认证
 
 ### 登录
@@ -86,7 +116,7 @@
 
 ### 更新配置
 
-`PATCH /api/v1/settings`（仅 `admin` 可调用）
+`PATCH /api/v1/settings`
 
 请求支持部分更新：
 
@@ -97,7 +127,7 @@
 
 说明：
 
-- 非 `admin` 调用返回 `403`（错误码 `2002`）
+- 缺少 `settings:update` 权限时返回 `403`（错误码 `2002`）
 - 更新后会写入 `system_config` 并立即热更新内存配置
 
 ## 安全
@@ -120,13 +150,17 @@
 
 以下接口均需要 Bearer Token。
 
-权限说明：除 `GET /api/v1/users/me` 与 `PATCH /api/v1/users/me` 外，用户管理接口均要求 `admin` 角色，非管理员返回 `403`（错误码 `2002`）。
+权限说明：用户管理接口由策略授权驱动，是否可访问由权限码与 scope 共同决定。
 
 ### 获取当前登录用户
 
 `GET /api/v1/users/me`
 
 返回当前 Bearer Token 对应用户信息，字段结构与 `GET /api/v1/users` 列表项一致。
+
+额外字段：
+
+- `permissions: string[]`：当前登录用户的有效权限集合（前端能力判断依据）
 
 ### 更新当前登录用户
 
@@ -139,6 +173,7 @@
 - 仅允许更新当前登录用户自己的资料
 - 请求体启用严格字段校验，拒绝 `role`、`is_active`、`metadata`、`username` 等非白名单字段
 - 至少需要提供一个可更新字段，否则返回参数错误
+- 响应包含最新 `permissions` 集合
 
 ### 获取用户列表
 
@@ -147,6 +182,11 @@
 查询参数：
 
 - `include_deleted`（可选，默认 `false`）：`false` 时仅返回未删除用户；`true` 时包含已逻辑删除用户
+
+授权说明：
+
+- 需要 `users:list` 权限
+- 结果受策略 scope 过滤（`ALL` / `SELF` / `ID:<uuid>`）
 
 响应示例：
 
@@ -186,6 +226,7 @@
 - `username` 为可选字段
 - 若提供 `username`，其值不能与其他未删除用户的 `email` 或 `phone` 相同
 - `username` 只能包含字母、数字、下划线，且必须至少包含一个字母，不能包含 `@`
+- 需要 `users:create` 权限
 
 ### 更新用户基本信息
 
@@ -197,6 +238,8 @@
 
 注意：至少需要提供一个可更新字段，否则返回参数错误。
 
+授权说明：需要 `users:update` 权限，且目标 `user_id` 必须满足策略 scope。
+
 ### 逻辑删除用户
 
 `DELETE /api/v1/users/{user_id}`
@@ -205,8 +248,12 @@
 
 说明：该操作为逻辑删除（设置 `deleted_at`），默认用户列表将隐藏该用户。
 
+授权说明：需要 `users:delete` 权限，且目标 `user_id` 必须满足策略 scope。
+
 ### 恢复已删除用户
 
 `POST /api/v1/users/{user_id}/restore`
 
 响应：`200 OK`，返回恢复后的用户对象。
+
+授权说明：需要 `users:restore` 权限，且目标 `user_id` 必须满足策略 scope。

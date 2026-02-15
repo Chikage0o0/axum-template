@@ -158,6 +158,7 @@ describe("toAuthUser", () => {
       is_active: true,
       metadata: {},
       identities: [],
+      permissions: ["users:me:view", " users:me:update "],
       created_at: "2026-02-06T09:00:00Z",
       updated_at: "2026-02-06T09:00:00Z",
     });
@@ -167,6 +168,7 @@ describe("toAuthUser", () => {
       displayName: "Alice",
       email: "alice@example.com",
       avatarUrl: "",
+      permissions: ["users:me:view", "users:me:update"],
     });
   });
 
@@ -190,6 +192,7 @@ describe("toAuthUser", () => {
       displayName: "Alice",
       email: "alice@example.com",
       avatarUrl: "https://example.com/avatar.png",
+      permissions: [],
     });
   });
 
@@ -204,6 +207,7 @@ describe("toAuthUser", () => {
       is_active: true,
       metadata: {},
       identities: [],
+      permissions: ["users:me:view"],
       created_at: "2026-02-06T09:00:00Z",
       updated_at: "2026-02-06T09:00:00Z",
     });

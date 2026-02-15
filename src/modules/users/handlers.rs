@@ -25,6 +25,8 @@ pub struct UserResponse {
     pub avatar_url: Option<String>,
     pub is_active: bool,
     pub metadata: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub permissions: Option<Vec<String>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -201,7 +203,8 @@ pub async fn get_current_user_handler(
     )
     .await?;
 
-    let user = get_user_by_id(&state.db, current_user.user_id).await?;
+    let mut user = get_user_by_id(&state.db, current_user.user_id).await?;
+    user.permissions = Some(load_current_user_permissions(&state, &current_user).await?);
     Ok(Json(user))
 }
 
@@ -235,7 +238,8 @@ pub async fn patch_current_user_handler(
     )
     .await?;
 
-    let user = patch_current_user(&state.db, current_user.user_id, payload).await?;
+    let mut user = patch_current_user(&state.db, current_user.user_id, payload).await?;
+    user.permissions = Some(load_current_user_permissions(&state, &current_user).await?);
     Ok(Json(user))
 }
 
@@ -523,6 +527,7 @@ ORDER BY created_at DESC
             avatar_url: row.avatar_url,
             is_active: row.is_active,
             metadata: row.metadata,
+            permissions: None,
             created_at: row.created_at,
             updated_at: row.updated_at,
         })
@@ -642,6 +647,7 @@ WHERE user_id = $1
         avatar_url: row.avatar_url,
         is_active: row.is_active,
         metadata: row.metadata,
+        permissions: None,
         created_at: row.created_at,
         updated_at: row.updated_at,
     })
@@ -682,6 +688,7 @@ LIMIT 1
         avatar_url: row.avatar_url,
         is_active: row.is_active,
         metadata: row.metadata,
+        permissions: None,
         created_at: row.created_at,
         updated_at: row.updated_at,
     })
@@ -736,6 +743,7 @@ RETURNING
         avatar_url: row.avatar_url,
         is_active: row.is_active,
         metadata: row.metadata,
+        permissions: None,
         created_at: row.created_at,
         updated_at: row.updated_at,
     })
@@ -810,6 +818,7 @@ RETURNING
         avatar_url: row.avatar_url,
         is_active: row.is_active,
         metadata: row.metadata,
+        permissions: None,
         created_at: row.created_at,
         updated_at: row.updated_at,
     })
@@ -871,9 +880,23 @@ RETURNING
         avatar_url: row.avatar_url,
         is_active: row.is_active,
         metadata: row.metadata,
+        permissions: None,
         created_at: row.created_at,
         updated_at: row.updated_at,
     })
+}
+
+async fn load_current_user_permissions(
+    state: &AppState,
+    current_user: &CurrentUser,
+) -> Result<Vec<String>, AppError> {
+    let request_id =
+        crate::api::request_id::current_request_id().unwrap_or_else(|| "req_unknown".to_string());
+    let ctx = current_user.authorization_context();
+    state
+        .authorization_service
+        .list_allowed_permissions(ctx.subjects(), &request_id)
+        .await
 }
 
 async fn ensure_username_not_conflicts_with_other_user_contacts(

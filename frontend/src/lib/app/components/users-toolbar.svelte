@@ -5,10 +5,12 @@
 
   let {
     loading = false,
+    canCreate = true,
     onRefresh,
     onCreate,
   }: {
     loading?: boolean;
+    canCreate?: boolean;
     onRefresh: () => void | Promise<void>;
     onCreate: () => void;
   } = $props();
@@ -19,7 +21,7 @@
     <RefreshCwIcon class={`size-4 ${loading ? "animate-spin" : ""}`} />
     {loading ? "刷新中..." : "刷新"}
   </Button>
-  <Button class="w-full sm:w-auto" onclick={onCreate}>
+  <Button class="w-full sm:w-auto" disabled={!canCreate} onclick={onCreate}>
     <UserPlusIcon class="size-4" />
     新增用户
   </Button>
