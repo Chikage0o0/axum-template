@@ -12,6 +12,8 @@ use crate::api::request_id::current_request_id;
 use crate::error::AppError;
 use crate::http::router::AppState;
 use crate::modules::authorization::context::AuthorizationContext;
+use crate::modules::authorization::permission::PermissionNode;
+use crate::modules::authorization::scope::{parse_scope_rule, Scope};
 use crate::modules::authorization::service::Decision;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,14 +48,19 @@ impl CurrentUser {
 pub async fn authorize(
     state: &AppState,
     current_user: &CurrentUser,
-    perm_code: &str,
+    permission: PermissionNode,
     resource_hint: Option<&str>,
 ) -> Result<Decision, AppError> {
     let request_id = current_request_id().unwrap_or_else(|| "req_unknown".to_string());
     let ctx = current_user.authorization_context();
     let decision = state
         .authorization_service
-        .authorize(ctx.subjects(), perm_code, resource_hint, &request_id)
+        .authorize(
+            ctx.subjects(),
+            permission.as_str(),
+            resource_hint,
+            &request_id,
+        )
         .await?;
 
     if !decision.allowed {
@@ -61,6 +68,16 @@ pub async fn authorize(
     }
 
     Ok(decision)
+}
+
+pub async fn authorize_scoped(
+    state: &AppState,
+    current_user: &CurrentUser,
+    permission: PermissionNode,
+    resource_hint: Option<&str>,
+) -> Result<Scope, AppError> {
+    let decision = authorize(state, current_user, permission, resource_hint).await?;
+    parse_scope_rule(decision.scope_rule.as_deref(), current_user.user_id)
 }
 
 pub async fn auth_middleware(

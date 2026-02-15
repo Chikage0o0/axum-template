@@ -7,12 +7,13 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::api::auth::{authorize, CurrentUser};
+use crate::api::auth::{authorize_scoped, CurrentUser};
 use crate::db::DbPool;
 use crate::error::AppError;
 use crate::http::router::AppState;
+use crate::modules::authorization::permission::PermissionNode;
 use crate::modules::authorization::scope::{
-    ensure_users_write_scope, parse_users_scope_rule, UsersScope,
+    ensure_scope_all_only, ensure_scope_target_user, Scope,
 };
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -195,13 +196,14 @@ pub async fn get_current_user_handler(
     State(state): State<AppState>,
 ) -> Result<Json<UserResponse>, AppError> {
     let resource_hint = current_user.user_id.to_string();
-    authorize(
+    let scope = authorize_scoped(
         &state,
         &current_user,
-        "users:me:view",
+        PermissionNode::UsersList,
         Some(resource_hint.as_str()),
     )
     .await?;
+    ensure_scope_target_user(scope, current_user.user_id)?;
 
     let mut user = get_user_by_id(&state.db, current_user.user_id).await?;
     user.permissions = Some(load_current_user_permissions(&state, &current_user).await?);
@@ -230,13 +232,14 @@ pub async fn patch_current_user_handler(
     >,
 ) -> Result<Json<UserResponse>, AppError> {
     let resource_hint = current_user.user_id.to_string();
-    authorize(
+    let scope = authorize_scoped(
         &state,
         &current_user,
-        "users:me:update",
+        PermissionNode::UsersUpdate,
         Some(resource_hint.as_str()),
     )
     .await?;
+    ensure_scope_target_user(scope, current_user.user_id)?;
 
     let mut user = patch_current_user(&state.db, current_user.user_id, payload).await?;
     user.permissions = Some(load_current_user_permissions(&state, &current_user).await?);
@@ -262,8 +265,7 @@ pub async fn get_users_handler(
     Query(query): Query<ListUsersQuery>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<UserResponse>>, AppError> {
-    let decision = authorize(&state, &current_user, "users:list", None).await?;
-    let scope = parse_users_scope_rule(decision.scope_rule.as_deref(), current_user.user_id)?;
+    let scope = authorize_scoped(&state, &current_user, PermissionNode::UsersList, None).await?;
     let users = list_users(&state.db, query.include_deleted, scope).await?;
     Ok(Json(users))
 }
@@ -288,7 +290,8 @@ pub async fn create_user_handler(
         CreateUserRequest,
     >,
 ) -> Result<(StatusCode, Json<UserResponse>), AppError> {
-    authorize(&state, &current_user, "users:create", None).await?;
+    let scope = authorize_scoped(&state, &current_user, PermissionNode::UsersCreate, None).await?;
+    ensure_scope_all_only(scope)?;
     let user = create_user(&state.db, payload).await?;
     Ok((StatusCode::CREATED, Json(user)))
 }
@@ -317,15 +320,14 @@ pub async fn patch_user_handler(
     >,
 ) -> Result<Json<UserResponse>, AppError> {
     let resource_hint = user_id.to_string();
-    let decision = authorize(
+    let scope = authorize_scoped(
         &state,
         &current_user,
-        "users:update",
+        PermissionNode::UsersUpdate,
         Some(resource_hint.as_str()),
     )
     .await?;
-    let scope = parse_users_scope_rule(decision.scope_rule.as_deref(), current_user.user_id)?;
-    ensure_users_write_scope(scope, user_id)?;
+    ensure_scope_target_user(scope, user_id)?;
 
     if current_user.user_id == user_id && payload.is_active == Some(false) {
         return Err(AppError::validation("管理员不能停用自己的账号"));
@@ -353,15 +355,14 @@ pub async fn delete_user_handler(
     State(state): State<AppState>,
 ) -> Result<StatusCode, AppError> {
     let resource_hint = user_id.to_string();
-    let decision = authorize(
+    let scope = authorize_scoped(
         &state,
         &current_user,
-        "users:delete",
+        PermissionNode::UsersDelete,
         Some(resource_hint.as_str()),
     )
     .await?;
-    let scope = parse_users_scope_rule(decision.scope_rule.as_deref(), current_user.user_id)?;
-    ensure_users_write_scope(scope, user_id)?;
+    ensure_scope_target_user(scope, user_id)?;
 
     if current_user.user_id == user_id {
         return Err(AppError::validation("管理员不能删除自己的账号"));
@@ -389,15 +390,14 @@ pub async fn restore_user_handler(
     State(state): State<AppState>,
 ) -> Result<Json<UserResponse>, AppError> {
     let resource_hint = user_id.to_string();
-    let decision = authorize(
+    let scope = authorize_scoped(
         &state,
         &current_user,
-        "users:restore",
+        PermissionNode::UsersRestore,
         Some(resource_hint.as_str()),
     )
     .await?;
-    let scope = parse_users_scope_rule(decision.scope_rule.as_deref(), current_user.user_id)?;
-    ensure_users_write_scope(scope, user_id)?;
+    ensure_scope_target_user(scope, user_id)?;
 
     let user = restore_user(&state.db, user_id).await?;
     Ok(Json(user))
@@ -420,7 +420,7 @@ struct UserRow {
 async fn list_users(
     db: &DbPool,
     include_deleted: bool,
-    scope: UsersScope,
+    scope: Scope,
 ) -> Result<Vec<UserResponse>, AppError> {
     let users: Vec<UserRow> = match (scope.list_filter_user_id(), include_deleted) {
         (None, true) => sqlx::query_as!(

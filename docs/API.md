@@ -38,12 +38,19 @@
 - 效果（Effect）：`ALLOW` / `DENY`（同优先级下 `DENY` 优先）
 - 权限命名：`<resource>:<action>`（如 `users:list`、`settings:update`）
 - 通配规则：支持 `users:*` 与 `*`
+- 权限节点真源：后端 `PermissionNode` enum（OpenAPI 会导出 enum，前端可直接解析）
 
 ### Scope 规则（一期）
 
 - `ALL`：不附加资源过滤
-- `SELF`：仅当前用户资源（用户域固定为 `users.id = current_user.id`）
+- `SELF`：仅当前登录用户资源（由接口语义映射到对应资源）
 - `ID:<uuid>`：仅指定资源 ID
+
+接口会在鉴权通过后继续执行 scope 约束校验，当前约束包括：
+
+- `ALL-only`：仅允许 `ALL`（如 `settings:*`、`authorization:permission-nodes:view`、`users:create`）
+- `CurrentUser`：仅允许当前登录用户（接受 `SELF` 或 `ID:<current_user_id>`）
+- `TargetUser`：目标用户接口接受 `ALL` 或匹配目标用户的 `ID:<uuid>`
 
 `scope_rule` 非法或无法解析时，接口固定 fail-closed：返回 `403`（错误码 `2002`），错误体包含 `request_id`，且与响应头 `x-request-id` 一致。
 
@@ -55,10 +62,43 @@
 ### 权限码（当前内置）
 
 - `*`
-- `users:*`、`users:me:view`、`users:me:update`、`users:list`、`users:create`、`users:update`、`users:delete`、`users:restore`
+- `users:*`、`users:list`、`users:create`、`users:update`、`users:delete`、`users:restore`
 - `settings:view`、`settings:update`
-- `security:password:update`
-- `sessions:current:delete`
+- `sessions:delete`
+- `authorization:permission-nodes:view`
+
+### 权限节点字典
+
+`GET /api/v1/authorization/permission-nodes`（需要 Bearer Token + `authorization:permission-nodes:view`）
+
+用途：前端配置权限项时，必须通过该接口拉取节点字典，禁止硬编码权限码。
+
+数据源：`sys_permission`（仅返回可被后端 `PermissionNode` 识别的权限码）。
+
+响应字段：
+
+- `version: string`：字典版本号（由本次返回的权限码序列计算非加密哈希，用于缓存与变更识别）
+- `items[]`：权限节点数组
+  - `code: PermissionNode`（后端 enum 导出值）
+  - `name: string`（展示名，来自 `sys_permission.perm_name`）
+  - `description: string`（说明，来自 `sys_permission.description`）
+  - `module: string`（模块标识，按 `code` 推导）
+
+响应示例：
+
+```json
+{
+  "version": "6ab9f1eb8f7d3388",
+  "items": [
+    {
+      "code": "users:list",
+      "name": "List Users",
+      "description": "查看用户列表",
+      "module": "users"
+    }
+  ]
+}
+```
 
 ## 认证
 
@@ -95,7 +135,7 @@
 
 ### 退出当前会话
 
-`DELETE /api/v1/sessions/current`（需要 Bearer Token）
+`DELETE /api/v1/sessions/current`（需要 Bearer Token + `sessions:delete`）
 
 响应：`204 No Content`。
 
@@ -134,7 +174,7 @@
 
 ### 修改当前登录用户密码
 
-`PATCH /api/v1/security/password`（需要 Bearer Token）
+`PATCH /api/v1/security/password`（需要 Bearer Token + `users:update`）
 
 请求示例：
 
@@ -158,6 +198,8 @@
 
 返回当前 Bearer Token 对应用户信息，字段结构与 `GET /api/v1/users` 列表项一致。
 
+授权说明：复用 `users:list` 权限，且 scope 必须约束到当前登录用户（`SELF` 或 `ID:<current_user_id>`）。
+
 额外字段：
 
 - `permissions: string[]`：当前登录用户的有效权限集合（前端能力判断依据）
@@ -167,6 +209,8 @@
 `PATCH /api/v1/users/me`
 
 支持按需更新：`display_name`、`email`、`phone`、`avatar_url`。
+
+授权说明：复用 `users:update` 权限，且 scope 必须约束到当前登录用户（`SELF` 或 `ID:<current_user_id>`）。
 
 说明：
 
@@ -227,6 +271,7 @@
 - 若提供 `username`，其值不能与其他未删除用户的 `email` 或 `phone` 相同
 - `username` 只能包含字母、数字、下划线，且必须至少包含一个字母，不能包含 `@`
 - 需要 `users:create` 权限
+- `scope_rule` 必须为 `ALL`
 
 ### 更新用户基本信息
 

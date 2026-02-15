@@ -190,6 +190,35 @@ export interface PatchUserRequest {
   username?: string | null;
 }
 
+export type PermissionNode = typeof PermissionNode[keyof typeof PermissionNode];
+
+
+export const PermissionNode = {
+  '*': '*',
+  'users:*': 'users:*',
+  'users:list': 'users:list',
+  'users:create': 'users:create',
+  'users:update': 'users:update',
+  'users:delete': 'users:delete',
+  'users:restore': 'users:restore',
+  'settings:view': 'settings:view',
+  'settings:update': 'settings:update',
+  'sessions:delete': 'sessions:delete',
+  'authorization:permission-nodes:view': 'authorization:permission-nodes:view',
+} as const;
+
+export interface PermissionNodeItemResponse {
+  code: PermissionNode;
+  description: string;
+  module: string;
+  name: string;
+}
+
+export interface PermissionNodeDictionaryResponse {
+  items: PermissionNodeItemResponse[];
+  version: string;
+}
+
 export interface SettingsResponse {
   app: AppSettings;
   integrations: IntegrationsSettings;
@@ -219,6 +248,27 @@ export type GetUsersHandlerParams = {
  */
 include_deleted?: boolean;
 };
+
+export const getListPermissionNodesHandlerUrl = () => {
+
+
+  
+
+  return `/api/v1/authorization/permission-nodes`
+}
+
+export const listPermissionNodesHandler = async ( options?: RequestInit): Promise<PermissionNodeDictionaryResponse> => {
+  
+  return apiClient<PermissionNodeDictionaryResponse>(getListPermissionNodesHandlerUrl(),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
 
 export const getPatchCurrentUserPasswordHandlerUrl = () => {
 

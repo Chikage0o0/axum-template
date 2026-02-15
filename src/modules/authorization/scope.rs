@@ -4,50 +4,57 @@ use crate::api::request_id::current_request_id;
 use crate::error::AppError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UsersScope {
+pub enum Scope {
     All,
     Id(Uuid),
 }
 
-impl UsersScope {
+impl Scope {
     pub fn list_filter_user_id(self) -> Option<Uuid> {
         match self {
-            UsersScope::All => None,
-            UsersScope::Id(user_id) => Some(user_id),
+            Scope::All => None,
+            Scope::Id(user_id) => Some(user_id),
         }
     }
 }
 
-pub fn parse_users_scope_rule(
+pub fn parse_scope_rule(
     scope_rule: Option<&str>,
     current_user_id: Uuid,
-) -> Result<UsersScope, AppError> {
+) -> Result<Scope, AppError> {
     let Some(raw) = scope_rule.map(str::trim).filter(|v| !v.is_empty()) else {
         return Err(scope_config_forbidden("missing_scope_rule", scope_rule));
     };
 
     if raw == "ALL" {
-        return Ok(UsersScope::All);
+        return Ok(Scope::All);
     }
 
     if raw == "SELF" {
-        return Ok(UsersScope::Id(current_user_id));
+        return Ok(Scope::Id(current_user_id));
     }
 
     if let Some(value) = raw.strip_prefix("ID:") {
         return Uuid::parse_str(value)
-            .map(UsersScope::Id)
+            .map(Scope::Id)
             .map_err(|_| scope_config_forbidden("invalid_scope_id", scope_rule));
     }
 
     Err(scope_config_forbidden("invalid_scope_rule", scope_rule))
 }
 
-pub fn ensure_users_write_scope(scope: UsersScope, target_user_id: Uuid) -> Result<(), AppError> {
+pub fn ensure_scope_all_only(scope: Scope) -> Result<(), AppError> {
     match scope {
-        UsersScope::All => Ok(()),
-        UsersScope::Id(allowed_user_id) if allowed_user_id == target_user_id => Ok(()),
-        UsersScope::Id(_) => Err(AppError::PermissionDenied("权限不足".to_string())),
+        Scope::All => Ok(()),
+        Scope::Id(_) => Err(scope_mismatch_forbidden("scope_requires_all", scope)),
+    }
+}
+
+pub fn ensure_scope_target_user(scope: Scope, target_user_id: Uuid) -> Result<(), AppError> {
+    match scope {
+        Scope::All => Ok(()),
+        Scope::Id(allowed_user_id) if allowed_user_id == target_user_id => Ok(()),
+        Scope::Id(_) => Err(AppError::PermissionDenied("权限不足".to_string())),
     }
 }
 
@@ -58,6 +65,21 @@ fn scope_config_forbidden(reason: &str, scope_rule: Option<&str>) -> AppError {
         scope_config_error = %reason,
         scope_rule = scope_rule.unwrap_or("<none>"),
         "scope rule rejected by fail-closed"
+    );
+    AppError::PermissionDenied("权限不足".to_string())
+}
+
+fn scope_mismatch_forbidden(reason: &str, scope: Scope) -> AppError {
+    let request_id = current_request_id().unwrap_or_else(|| "req_unknown".to_string());
+    let scope = match scope {
+        Scope::All => "ALL".to_string(),
+        Scope::Id(user_id) => format!("ID:{user_id}"),
+    };
+    tracing::warn!(
+        %request_id,
+        scope_constraint_error = %reason,
+        scope = %scope,
+        "scope rejected by endpoint constraint"
     );
     AppError::PermissionDenied("权限不足".to_string())
 }

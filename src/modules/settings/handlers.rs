@@ -4,9 +4,11 @@ use garde::Validate;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::api::auth::{authorize, CurrentUser};
+use crate::api::auth::{authorize_scoped, CurrentUser};
 use crate::error::AppError;
 use crate::http::router::AppState;
+use crate::modules::authorization::permission::PermissionNode;
+use crate::modules::authorization::scope::ensure_scope_all_only;
 use crate::services::system_config;
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -42,7 +44,8 @@ pub async fn get_settings_handler(
     Extension(current_user): Extension<CurrentUser>,
     State(state): State<AppState>,
 ) -> Result<Json<SettingsResponse>, AppError> {
-    authorize(&state, &current_user, "settings:view", None).await?;
+    let scope = authorize_scoped(&state, &current_user, PermissionNode::SettingsView, None).await?;
+    ensure_scope_all_only(scope)?;
 
     let cfg = state.config.load_full();
 
@@ -125,7 +128,9 @@ pub async fn patch_settings_handler(
         PatchSettingsRequest,
     >,
 ) -> Result<Json<SettingsResponse>, AppError> {
-    authorize(&state, &current_user, "settings:update", None).await?;
+    let scope =
+        authorize_scoped(&state, &current_user, PermissionNode::SettingsUpdate, None).await?;
+    ensure_scope_all_only(scope)?;
     let mut changes: Vec<(String, serde_json::Value)> = Vec::new();
 
     if let Some(app) = payload.app {

@@ -2,6 +2,8 @@ use serde::Serialize;
 use utoipa::openapi::security::{Http, HttpAuthScheme, SecurityScheme};
 use utoipa::{Modify, OpenApi, ToSchema};
 
+use crate::modules::authorization::handlers as authorization_handlers;
+use crate::modules::authorization::permission::PermissionNode;
 use crate::modules::security::handlers as security_handlers;
 use crate::modules::sessions::handlers as sessions;
 use crate::modules::settings::handlers as settings;
@@ -41,6 +43,7 @@ impl Modify for SecurityAddon {
         (name = "sessions", description = "认证与会话"),
         (name = "settings", description = "运行期配置"),
         (name = "security", description = "安全与凭证管理"),
+        (name = "authorization", description = "权限模型与字典"),
         (name = "users", description = "用户管理")
     ),
     modifiers(&SecurityAddon),
@@ -48,6 +51,7 @@ impl Modify for SecurityAddon {
         sessions::create_session_handler,
         sessions::refresh_session_handler,
         sessions::delete_current_session_handler,
+        authorization_handlers::list_permission_nodes_handler,
         settings::get_settings_handler,
         settings::patch_settings_handler,
         security_handlers::patch_current_user_password_handler,
@@ -63,6 +67,9 @@ impl Modify for SecurityAddon {
         ErrorResponseBody,
         sessions::CreateSessionRequest,
         sessions::CreateSessionResponse,
+        PermissionNode,
+        authorization_handlers::PermissionNodeItemResponse,
+        authorization_handlers::PermissionNodeDictionaryResponse,
         settings::SettingsResponse,
         settings::AppSettings,
         settings::IntegrationsSettings,
@@ -80,6 +87,7 @@ pub struct ApiDoc;
 
 #[cfg(test)]
 mod tests {
+    use serde_json::Value;
     use utoipa::OpenApi;
 
     use super::ApiDoc;
@@ -127,6 +135,39 @@ mod tests {
             .paths
             .paths
             .contains_key("/api/v1/security/admin-password"));
+    }
+
+    #[test]
+    fn should_expose_permission_nodes_dictionary_path() {
+        let doc = ApiDoc::openapi();
+
+        assert!(doc
+            .paths
+            .paths
+            .contains_key("/api/v1/authorization/permission-nodes"));
+    }
+
+    #[test]
+    fn permission_node_schema_should_use_permission_codes() {
+        let doc = ApiDoc::openapi();
+        let json = serde_json::to_value(&doc).expect("openapi 应可序列化为 JSON");
+        let enum_values = json
+            .pointer("/components/schemas/PermissionNode/enum")
+            .and_then(Value::as_array)
+            .expect("PermissionNode 应为枚举 schema");
+
+        assert!(
+            enum_values
+                .iter()
+                .any(|item| item.as_str() == Some("users:list")),
+            "PermissionNode 枚举值应包含权限码"
+        );
+        assert!(
+            enum_values
+                .iter()
+                .all(|item| item.as_str() != Some("UsersList")),
+            "PermissionNode 枚举值不应使用 Rust 变体名"
+        );
     }
 
     #[test]

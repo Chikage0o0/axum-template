@@ -11,6 +11,12 @@ pub struct PolicyRepository {
     db: DbPool,
 }
 
+pub struct PermissionDictionaryRow {
+    pub perm_code: String,
+    pub perm_name: String,
+    pub description: Option<String>,
+}
+
 impl PolicyRepository {
     pub fn new(db: DbPool) -> Self {
         Self { db }
@@ -139,6 +145,30 @@ ORDER BY perm_code ASC
         .fetch_all(&self.db)
         .await
         .map_err(|e| AppError::InternalError(format!("读取权限码失败: {e}")))
+    }
+
+    pub async fn list_permission_dictionary_rows(
+        &self,
+    ) -> Result<Vec<PermissionDictionaryRow>, AppError> {
+        let rows = sqlx::query!(
+            r#"
+SELECT perm_code, perm_name, description
+FROM sys_permission
+ORDER BY perm_code ASC
+            "#,
+        )
+        .fetch_all(&self.db)
+        .await
+        .map_err(|e| AppError::InternalError(format!("读取权限字典失败: {e}")))?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| PermissionDictionaryRow {
+                perm_code: row.perm_code,
+                perm_name: row.perm_name,
+                description: row.description,
+            })
+            .collect())
     }
 }
 

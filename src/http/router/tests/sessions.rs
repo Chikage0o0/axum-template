@@ -231,3 +231,41 @@ async fn concurrent_refresh_with_same_cookie_should_only_succeed_once(pool: sqlx
 
     cleanup_test_users(&pool, &[user_id]).await;
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn explicit_user_deny_sessions_current_delete_should_forbid_logout(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let username = format!("logout_deny_user_{}", Uuid::new_v4().simple());
+    let email = format!("{username}@example.invalid");
+    let password = "LogoutDenyPassword#A123";
+    let user_id = create_or_update_user_with_password(&pool, &username, &email, password).await;
+
+    let _policy_id = insert_test_policy(
+        &pool,
+        "USER",
+        &user_id.to_string(),
+        "sessions:delete",
+        "DENY",
+        "SELF",
+        100,
+    )
+    .await;
+
+    let (token, _) = login_and_get_tokens(&server, &username, password).await;
+    let response = request_json(
+        &server,
+        Method::DELETE,
+        "/api/v1/sessions/current",
+        Some(&token),
+        None,
+        None,
+    )
+    .await;
+
+    assert_eq!(response.status_code(), StatusCode::FORBIDDEN);
+    let body = response.json::<Value>();
+    assert_eq!(body.get("code").and_then(Value::as_u64), Some(2002));
+
+    cleanup_test_users(&pool, &[user_id]).await;
+}

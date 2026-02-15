@@ -13,6 +13,7 @@ use crate::api::openapi::ApiDoc;
 use crate::config::runtime::RuntimeConfig;
 use crate::db::DbPool;
 use crate::error::AppError;
+use crate::modules::authorization::handlers::list_permission_nodes_handler;
 use crate::modules::authorization::service::AuthorizationService;
 use crate::modules::security::handlers::patch_current_user_password_handler;
 use crate::modules::sessions::handlers::{
@@ -49,6 +50,10 @@ pub fn app_router(state: AppState) -> Router {
         .route("/api/v1/sessions/refresh", post(refresh_session_handler));
 
     let protected_routes = Router::new()
+        .route(
+            "/api/v1/authorization/permission-nodes",
+            get(list_permission_nodes_handler),
+        )
         .route(
             "/api/v1/settings",
             get(get_settings_handler).patch(patch_settings_handler),
@@ -388,6 +393,7 @@ SET value = EXCLUDED.value,
         (token, cookie_pair)
     }
 
+    mod authorization;
     mod security;
     mod sessions;
     mod settings;

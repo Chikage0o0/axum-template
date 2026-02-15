@@ -10,10 +10,13 @@ use sqlx::FromRow;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::api::auth::authorize_scoped;
 use crate::api::auth::Claims;
 use crate::api::auth::CurrentUser;
 use crate::error::AppError;
 use crate::http::router::AppState;
+use crate::modules::authorization::permission::PermissionNode;
+use crate::modules::authorization::scope::ensure_scope_target_user;
 
 const ACCESS_TOKEN_EXPIRES_IN_SECS: u64 = 15 * 60;
 const REFRESH_TOKEN_EXPIRES_IN_SECS: i64 = 30 * 24 * 60 * 60;
@@ -233,6 +236,7 @@ WHERE id = $1
     responses(
         (status = 204, description = "当前会话已退出（无 body）"),
         (status = 401, description = "未登录或 Token 无效", body = crate::api::openapi::ErrorResponseBody),
+        (status = 403, description = "权限不足", body = crate::api::openapi::ErrorResponseBody),
         (status = 500, description = "服务器内部错误", body = crate::api::openapi::ErrorResponseBody)
     ),
     security(("bearer_auth" = []))
@@ -241,6 +245,16 @@ pub async fn delete_current_session_handler(
     axum::extract::Extension(current_user): axum::extract::Extension<CurrentUser>,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, AppError> {
+    let resource_hint = current_user.user_id.to_string();
+    let scope = authorize_scoped(
+        &state,
+        &current_user,
+        PermissionNode::SessionsDelete,
+        Some(resource_hint.as_str()),
+    )
+    .await?;
+    ensure_scope_target_user(scope, current_user.user_id)?;
+
     sqlx::query!(
         r#"
 UPDATE auth_sessions

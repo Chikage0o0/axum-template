@@ -143,6 +143,7 @@ async fn repository_should_filter_expired_and_permission_candidates(pool: sqlx::
     let user_id = Uuid::new_v4();
     let now = Utc::now();
     let user_key = user_id.to_string();
+    let role_key = "repo_test_role";
 
     let valid_exact = insert_policy(
         &pool,
@@ -162,7 +163,7 @@ async fn repository_should_filter_expired_and_permission_candidates(pool: sqlx::
         &pool,
         InsertPolicyParams {
             subject_type: "ROLE",
-            subject_key: "user",
+            subject_key: role_key,
             perm_code: "users:*",
             effect: "ALLOW",
             scope_rule: "ALL",
@@ -176,7 +177,7 @@ async fn repository_should_filter_expired_and_permission_candidates(pool: sqlx::
         &pool,
         InsertPolicyParams {
             subject_type: "ROLE",
-            subject_key: "user",
+            subject_key: role_key,
             perm_code: "*",
             effect: "ALLOW",
             scope_rule: "ALL",
@@ -206,7 +207,7 @@ async fn repository_should_filter_expired_and_permission_candidates(pool: sqlx::
         &pool,
         InsertPolicyParams {
             subject_type: "ROLE",
-            subject_key: "user",
+            subject_key: role_key,
             perm_code: "settings:view",
             effect: "ALLOW",
             scope_rule: "ALL",
@@ -223,7 +224,7 @@ async fn repository_should_filter_expired_and_permission_candidates(pool: sqlx::
         },
         Subject {
             subject_type: SubjectType::Role,
-            subject_key: "user".to_string(),
+            subject_key: role_key.to_string(),
         },
     ];
 

@@ -130,7 +130,6 @@ async fn non_admin_should_forbidden_on_user_management_routes(pool: sqlx::PgPool
     let (token, _) = login_and_get_tokens(&server, &username, password).await;
 
     let routes = vec![
-        (Method::GET, "/api/v1/users".to_string(), None),
         (
             Method::POST,
             "/api/v1/users".to_string(),
@@ -634,9 +633,69 @@ async fn get_current_user_should_include_permissions(pool: sqlx::PgPool) {
             .any(|item| item.as_str().is_some_and(|value| value == perm))
     };
 
-    assert!(contains_perm("users:me:view"));
-    assert!(contains_perm("users:me:update"));
-    assert!(!contains_perm("users:list"));
+    assert!(contains_perm("users:list"));
+    assert!(contains_perm("users:update"));
+    assert!(!contains_perm("users:me:view"));
+    assert!(!contains_perm("users:me:update"));
+
+    cleanup_test_users(&pool, &[user_id]).await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn get_current_user_permissions_should_ignore_unknown_permission_nodes(pool: sqlx::PgPool) {
+    let server = setup_user_management_test_app(pool.clone()).await;
+
+    let username = format!("unknown_perm_user_{}", Uuid::new_v4().simple());
+    let email = format!("{username}@example.invalid");
+    let password = "UnknownPermPwd#A123";
+    let user_id = create_or_update_user_with_password(&pool, &username, &email, password).await;
+
+    sqlx::query!(
+        r#"
+INSERT INTO sys_permission (perm_code, perm_name, description)
+VALUES ('users:experimental', 'Users Experimental', 'test only permission')
+ON CONFLICT (perm_code) DO NOTHING
+        "#,
+    )
+    .execute(&pool)
+    .await
+    .expect("插入测试权限失败");
+
+    let _policy_id = insert_test_policy(
+        &pool,
+        "USER",
+        &user_id.to_string(),
+        "users:experimental",
+        "ALLOW",
+        "SELF",
+        80,
+    )
+    .await;
+
+    let (token, _) = login_and_get_tokens(&server, &username, password).await;
+    let response = request_json(
+        &server,
+        Method::GET,
+        "/api/v1/users/me",
+        Some(&token),
+        None,
+        None,
+    )
+    .await;
+
+    assert_eq!(response.status_code(), StatusCode::OK);
+    let body = response.json::<Value>();
+    let permissions = body
+        .get("permissions")
+        .and_then(Value::as_array)
+        .expect("/users/me 应包含 permissions 数组");
+
+    assert!(
+        !permissions
+            .iter()
+            .any(|item| item.as_str() == Some("users:experimental")),
+        "未知权限节点不应出现在用户权限快照中"
+    );
 
     cleanup_test_users(&pool, &[user_id]).await;
 }
@@ -675,13 +734,16 @@ async fn policy_permissions_and_scope_should_work_end_to_end(pool: sqlx::PgPool)
         .expect("/users/me 应返回 permissions 数组");
     assert!(me_before_permissions
         .iter()
-        .any(|v| v.as_str() == Some("users:me:view")));
+        .any(|v| v.as_str() == Some("users:list")));
     assert!(me_before_permissions
         .iter()
-        .any(|v| v.as_str() == Some("users:me:update")));
+        .any(|v| v.as_str() == Some("users:update")));
     assert!(!me_before_permissions
         .iter()
-        .any(|v| v.as_str() == Some("users:list")));
+        .any(|v| v.as_str() == Some("users:me:view")));
+    assert!(!me_before_permissions
+        .iter()
+        .any(|v| v.as_str() == Some("users:me:update")));
 
     let _list_policy = insert_test_policy(
         &pool,

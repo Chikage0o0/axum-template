@@ -4,9 +4,11 @@ use garde::Validate;
 use serde::Deserialize;
 use utoipa::ToSchema;
 
-use crate::api::auth::CurrentUser;
+use crate::api::auth::{authorize_scoped, CurrentUser};
 use crate::error::AppError;
 use crate::http::router::AppState;
+use crate::modules::authorization::permission::PermissionNode;
+use crate::modules::authorization::scope::ensure_scope_target_user;
 
 #[derive(Debug, Deserialize, ToSchema, Validate)]
 pub struct PatchCurrentUserPasswordRequest {
@@ -29,6 +31,7 @@ pub struct PatchCurrentUserPasswordRequest {
         (status = 204, description = "修改当前用户密码成功（无 body）"),
         (status = 400, description = "请求参数错误", body = crate::api::openapi::ErrorResponseBody),
         (status = 401, description = "未登录或 Token 无效 / 当前密码错误", body = crate::api::openapi::ErrorResponseBody),
+        (status = 403, description = "权限不足", body = crate::api::openapi::ErrorResponseBody),
         (status = 404, description = "当前用户不存在", body = crate::api::openapi::ErrorResponseBody),
         (status = 500, description = "服务器内部错误", body = crate::api::openapi::ErrorResponseBody)
     ),
@@ -41,6 +44,16 @@ pub async fn patch_current_user_password_handler(
         PatchCurrentUserPasswordRequest,
     >,
 ) -> Result<StatusCode, AppError> {
+    let resource_hint = current_user.user_id.to_string();
+    let scope = authorize_scoped(
+        &state,
+        &current_user,
+        PermissionNode::UsersUpdate,
+        Some(resource_hint.as_str()),
+    )
+    .await?;
+    ensure_scope_target_user(scope, current_user.user_id)?;
+
     let current_hash = load_current_user_password_hash(&state, current_user.user_id).await?;
 
     let ok = crate::password::verify_password(&payload.current_password, &current_hash)

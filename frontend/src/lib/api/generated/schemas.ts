@@ -3,11 +3,24 @@
 
 import { z } from "zod";
 
-export const PatchCurrentUserPasswordRequest = z
-  .object({
-    current_password: z.string().min(1).max(256),
-    new_password: z.string().min(8).max(256),
-  })
+export const PermissionNode = z.enum([
+  "*",
+  "users:*",
+  "users:list",
+  "users:create",
+  "users:update",
+  "users:delete",
+  "users:restore",
+  "settings:view",
+  "settings:update",
+  "sessions:delete",
+  "authorization:permission-nodes:view",
+]);
+export const PermissionNodeItemResponse = z
+  .object({ code: PermissionNode, description: z.string(), module: z.string(), name: z.string() })
+  .passthrough();
+export const PermissionNodeDictionaryResponse = z
+  .object({ items: z.array(PermissionNodeItemResponse), version: z.string() })
   .passthrough();
 export const ErrorResponseBody = z
   .object({
@@ -15,6 +28,12 @@ export const ErrorResponseBody = z
     details: z.unknown().optional(),
     message: z.string(),
     request_id: z.string(),
+  })
+  .passthrough();
+export const PatchCurrentUserPasswordRequest = z
+  .object({
+    current_password: z.string().min(1).max(256),
+    new_password: z.string().min(8).max(256),
   })
   .passthrough();
 export const CreateSessionRequest = z

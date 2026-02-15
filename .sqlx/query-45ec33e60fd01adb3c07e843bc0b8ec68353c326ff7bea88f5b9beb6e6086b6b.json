@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\nSELECT perm_code, perm_name, description\nFROM sys_permission\nORDER BY perm_code ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "perm_code",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "perm_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "description",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "45ec33e60fd01adb3c07e843bc0b8ec68353c326ff7bea88f5b9beb6e6086b6b"
+}
