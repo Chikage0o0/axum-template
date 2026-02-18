@@ -107,28 +107,27 @@ export async function apiClient<T>(url: string, init: RequestInit = {}): Promise
     const message = body?.message || `HTTP ${res.status}`;
 
     if (res.status === 401 && shouldAutoLogoutOnUnauthorized(body) && !isRefreshEndpoint(url)) {
-      const refreshedToken = await refreshAccessToken();
-      if (refreshedToken) {
-        const retryRes = await fetch(url, {
-          ...init,
-          headers: buildHeaders(init, refreshedToken),
-        });
-        if (retryRes.ok) {
-          if (retryRes.status === 204) return undefined as T;
-          const retryJson = (await readJsonSafe(retryRes)) as unknown | null;
-          if (retryJson === null) {
-            throw new ApiError("响应不是 JSON", retryRes.status);
+      if (tokenAtStart) {
+        const refreshedToken = await refreshAccessToken();
+        if (refreshedToken) {
+          const retryRes = await fetch(url, {
+            ...init,
+            headers: buildHeaders(init, refreshedToken),
+          });
+          if (retryRes.ok) {
+            if (retryRes.status === 204) return undefined as T;
+            const retryJson = (await readJsonSafe(retryRes)) as unknown | null;
+            if (retryJson === null) {
+              throw new ApiError("响应不是 JSON", retryRes.status);
+            }
+            return retryJson as T;
           }
-          return retryJson as T;
         }
-      }
 
-      const currentToken = auth.readTokenFromStorage();
-      if (tokenAtStart && currentToken === tokenAtStart) {
-        auth.logout({ reason: "expired" });
-      }
-      if (!tokenAtStart) {
-        auth.logout({ reason: "expired" });
+        const currentToken = auth.readTokenFromStorage();
+        if (currentToken === tokenAtStart) {
+          auth.logout({ reason: "expired" });
+        }
       }
     }
 

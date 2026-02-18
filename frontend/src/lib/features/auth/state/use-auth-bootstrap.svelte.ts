@@ -20,27 +20,20 @@ export function useAuthBootstrap() {
   $effect(() => {
     if (authState.current.isAuthenticated || ensuringSession) return;
 
-    let cancelled = false;
     ensuringSession = true;
 
     void (async () => {
       try {
         const refreshedToken = await refreshAccessToken();
-        if (cancelled) return;
         if (!refreshedToken) {
           await logoutAndRedirect();
         }
       } catch {
-        if (cancelled) return;
         await logoutAndRedirect();
       } finally {
         ensuringSession = false;
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
   });
 
   $effect(() => {

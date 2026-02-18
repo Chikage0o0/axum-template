@@ -163,6 +163,58 @@ describe("apiClient", () => {
     expect(get(auth).token).toBe("token-new");
   });
 
+  it("已登出且无 token 时，后续 401 不应再次触发 refresh", async () => {
+    auth.login("token-old");
+
+    let refreshCalls = 0;
+
+    globalThis.fetch = async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+
+      if (url === "/api/v1/settings") {
+        return new Response(
+          JSON.stringify({
+            code: 1001,
+            message: "身份验证失败: Token 无效或已过期",
+            request_id: "req_5",
+          }),
+          {
+            status: 401,
+            headers: { "content-type": "application/json" },
+          },
+        );
+      }
+
+      if (url === "/api/v1/sessions/refresh") {
+        refreshCalls += 1;
+        return new Response(
+          JSON.stringify({
+            code: 1001,
+            message: "身份验证失败: Token 无效或已过期",
+            request_id: "req_refresh",
+          }),
+          {
+            status: 401,
+            headers: { "content-type": "application/json" },
+          },
+        );
+      }
+
+      return new Response(null, { status: 404 });
+    };
+
+    await expect(apiClient<void>("/api/v1/settings", { method: "GET" })).rejects.toBeInstanceOf(
+      ApiError,
+    );
+    expect(get(auth).isAuthenticated).toBeFalse();
+
+    await expect(apiClient<void>("/api/v1/settings", { method: "GET" })).rejects.toBeInstanceOf(
+      ApiError,
+    );
+
+    expect(refreshCalls).toBe(1);
+  });
+
   it("并发刷新时应复用同一个 refresh 请求", async () => {
     auth.login("token-old");
 
